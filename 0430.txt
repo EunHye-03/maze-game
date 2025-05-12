@@ -1,0 +1,119 @@
+STAGE마다 각각의 함수가 존재?
+
+key_move();
+start();
+game();
+stage_n();
+
+main() {
+    start();
+    game();
+}
+
+key_move() {
+    if (start키를 엔터하면) {
+        
+    }
+}
+
+start() {
+    ncurses() : 항목 배치
+    key_move() : 방향 키로 해서 넘어가면은 #으로 네모난 select point 생김
+    if (START) return
+    else if (QUIT) return 프로그램 종료
+}
+
+stage_n {
+    alarm() : 시간이 되면은 종료
+    미로 생성()
+    캐릭터 생성()
+    적 생성 ()
+    item 생성() -- n >= 5 (usleep()을 통한 시간 조절)
+    stage_interface()
+    ncurses() : 시스템 생성과 종료
+}
+ 
+interface() {
+    STAGE N + 조작법 + 시간
+    draw_heart()
+    draw_star()
+}
+ 
+information() {
+    utmp -> user name mapping, 어느 stage까지 깼는지 (조건에 따라서 clear 여부가 달라짐)
+    게임 조작법
+    언제 제작
+    누가 제작
+    ncurses() : exit
+    key_move()
+}
+ 
+click_q() {
+    pauses == TRUE;
+    ncurses()
+    key_move()
+}
+ 
+over() {
+    ncurses()
+    mouse()
+}
+ 
+handle_input() {
+    key 조작
+    W : UP
+    A : LEFT
+    D : RIGHT
+    S : DOWN
+    ENTER : SELECT
+}
+ 
+draw_maze() {
+    DFS를 통한 random 벽 생성
+}
+
+draw_char() {
+    왼쪽 상단 빈 공간에서만 생성 가능
+}
+
+draw_enemy() {
+    char가 생성 될 수 없는 공간에만 생성 가능
+}
+
+draw_item() {
+    char가 생성 될 수 없는 공간
+    빈 공간을 찾아서 random 생성
+    item이나 enemy 생성이 돼있으면 일정 반경까지는 생성이 불가
+}
+
+draw_heart() {
+
+}
+
+draw_star() {
+
+}
+ 
+game() {
+    draw()
+    handle_input()
+    interface()
+    stage_n();
+    if (CLEAR) {
+        clear();
+    }
+}
+ 
+if (Q) {
+    click_q();
+}
+ 
+if (OVER) {
+    over();
+}
+
+ 
+main() {
+    start();
+    game();
+}
