@@ -343,6 +343,12 @@ int main() {
                 mvprintw(h-2, 2, "%s", "Develop: uriid1");
 
                 box(stdscr, 0, 0);
+
+                // Exit to menu
+                if (key_pressed == 'q') {
+                    current_state = STATE_MENU;
+                    erase();
+                }
             break;
 
             // Game
@@ -359,13 +365,7 @@ int main() {
             break;
         }
 
-        // Exit to menu
-        if (key_pressed == 'q')
-            current_state = STATE_MENU;
-
         // Get key pressed
-        key_pressed = wgetch(stdscr);
-        napms(100);
         key_pressed = wgetch(stdscr);
 
         // Clear
