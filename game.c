@@ -2,7 +2,6 @@
     ####--------------------------------####
     #--# Author:   by hyunsu, eunhye    #--#
     #--# License:  GNU GPLv3            #--#
-    #--# Telegram: @main_moderator      #--#
     #--# E-mail:   zmfnwj119@gmail.com  #--#
     ####--------------------------------####
 */
@@ -11,6 +10,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
+#include <utmp.h>
 #include <math.h>
 #include <ncurses.h>
 #include <time.h>
@@ -18,8 +19,6 @@
 
 // Constants
 // Const define
-#define ROW 20 // Maze rows
-#define COL 27 // Maze columns
 #define true 1
 #define false 0
 
@@ -40,30 +39,32 @@ int key_pressed = 0;
 #define c_hud    1
 
 // Directions (up, down, left, right)
-int dx[] = {-1, 1, 0, 0};
-int dy[] = {0, 0, -1, 1};
+int dx[] = {-2, 2, 0, 0};
+int dy[] = {0, 0, -2, 2};
 
 // Global Variables
-short maze[ROW][COL];       // Maze map
-bool visited[ROW][COL];     // Visited check array
+char username[11] = {0};    // User name stored
 short level = 1;            // Current level
 short score = 0;            // Player score
 short lifes = 3;            // Player lives
 int star_in_level = 0;      // Stars in the level
 int current_lvl_x, current_lvl_y; // Level size
 int w, h;                   // Window width and height
+int maze_width = 60;  // 기본 가로 크기
+int maze_height = 10; // 기본 세로 크기
 
 ////////////////////
 // Utility Functions
 ////////////////////
 
 // Shuffle directions randomly
-void shuffle(int arr[], int size) {
-    for (int i = size - 1; i > 0; i--) {
-        int j = rand() % (i + 1);
-        int temp = arr[i];
-        arr[i] = arr[j];
-        arr[j] = temp;
+void shuffle_directions(int* dirs) {
+    for (int i = 0; i < 4; i++) dirs[i] = i;
+    for (int i = 0; i < 4; i++) {
+        int j = rand() % 4;
+        int tmp = dirs[i];
+        dirs[i] = dirs[j];
+        dirs[j] = tmp;
     }
 }
 
@@ -83,66 +84,112 @@ void SetColor() {
     init_pair(c_minus,  COLOR_GREEN,     COLOR_BLACK);
     init_pair(c_player, COLOR_MAGENTA,   COLOR_BLACK);
     init_pair(c_enemy,  COLOR_RED,       COLOR_BLACK);
-    init_pair(c_hud,    COLOR_BLUE,     COLOR_BLACK); // HUD color
+    init_pair(c_hud,    COLOR_WHITE,     COLOR_BLACK); // HUD color
 }
 
 ////////////////////
 // Maze Functions
 ////////////////////
 
-// Generate maze using BFS
-void generate_maze(int start_x, int start_y) {
-    int queue[ROW * COL][2];
-    int front = 0, rear = 0;
+// Add the Maze structure and related functions
+typedef struct Maze {
+    int width;
+    int height;
+    bool *right_walls;
+    bool *down_walls;
+} Maze;
 
-    // Add starting point to the queue
-    queue[rear][0] = start_x;
-    queue[rear][1] = start_y;
-    rear++;
-    visited[start_x][start_y] = true;
-    maze[start_x][start_y] = 0; // Set as a path
+typedef struct Point {
+    int x;
+    int y;
+} Point;
 
-    while (front < rear) {
-        int x = queue[front][0];
-        int y = queue[front][1];
-        front++;
+typedef struct PointList {
+    Point *items;
+    int count;
+    int capacity;
+} PointList;
 
-        // Randomize directions
-        int directions[] = {0, 1, 2, 3};
-        shuffle(directions, 4);
+PointList make_list(int cap) {
+    Point *items = calloc(cap, sizeof(Point));
+    PointList ptls = {
+        .items = items,
+        .count = 0,
+        .capacity = cap,
+    };
+    return ptls;
+}
 
-        for (int i = 0; i < 4; i++) {
-            int nx = x + dx[directions[i]];
-            int ny = y + dy[directions[i]];
+#define da_append(arr, item) \
+    do {\
+        if ((arr)->count >= (arr)->capacity) {\
+            (arr)->capacity *= 2;\
+            (arr)->items = realloc((arr)->items, (arr)->capacity * sizeof((arr)->items[0]));\
+        }\
+        (arr)->items[(arr)->count++] = item;\
+    } while(0)
 
-            // Check if within maze bounds and not visited
-            if (nx > 0 && nx < ROW - 1 && ny > 0 && ny < COL - 1 && !visited[nx][ny]) {
-                // Skip 2 cells and create a path
-                int wall_x = x + dx[directions[i]] / 2;
-                int wall_y = y + dy[directions[i]] / 2;
+#define da_pop(arr) \
+    (arr)->items[--(arr)->count]
 
-                visited[nx][ny] = true;
-                maze[nx][ny] = 0; // Create path
-                maze[wall_x][wall_y] = 0; // Remove wall
+void enable_all_walls(Maze *maze) {
+    int n_cells = maze->width * maze->height;
+    memset(maze->right_walls, 1, sizeof(bool) * n_cells);
+    memset(maze->down_walls, 1, sizeof(bool) * n_cells);
+}
 
-                queue[rear][0] = nx;
-                queue[rear][1] = ny;
-                rear++;
-            }
-        }
+void remove_wall_between(Maze *maze, Point old, Point new) {
+    if (old.x + 1 == new.x) {
+        maze->right_walls[old.x + old.y * maze->width] = false; // Remove right wall of old
+    } else if (old.x - 1 == new.x) {
+        maze->right_walls[new.x + new.y * maze->width] = false; // Remove left wall of new
+    } else if (old.y + 1 == new.y) {
+        maze->down_walls[old.x + old.y * maze->width] = false; // Remove bottom wall of old
+    } else if (old.y - 1 == new.y) {
+        maze->down_walls[new.x + new.y * maze->width] = false; // Remove top wall of new
     }
 }
 
-// Print the maze
-void print_maze() {
-    for (int i = 0; i < ROW; i++) {
-        for (int j = 0; j < COL; j++) {
-            if (maze[i][j] == 1) {
-                mvprintw(i + 10, j, "#"); // Wall
-            } else {
-                mvprintw(i + 10, j, " "); // Path
-            }
+// Check if a Point exists in a PointList
+bool list_contains(PointList list, Point point) {
+    for (int i = 0; i < list.count; i++) {
+        if (list.items[i].x == point.x && list.items[i].y == point.y) {
+            return true;
         }
+    }
+    return false;
+}
+
+void maze_gen_step(Maze *maze, Point *current, PointList *visited, PointList *path, PointList *backtracked) {
+    if (!list_contains(*visited, *current)) {
+        da_append(visited, *current);
+    }
+
+    int dirs[] = {0, 1, 2, 3}; // 0: UP, 1: DOWN, 2: LEFT, 3: RIGHT
+    shuffle_directions(dirs);
+
+    for (int i = 0; i < 4; i++) {
+        Point next = *current;
+        switch (dirs[i]) {
+            case 0: next.y -= 1; break; // UP
+            case 1: next.y += 1; break; // DOWN
+            case 2: next.x -= 1; break; // LEFT
+            case 3: next.x += 1; break; // RIGHT
+        }
+
+        if (next.x >= 0 && next.x < maze->width && next.y >= 0 && next.y < maze->height &&
+            !list_contains(*visited, next)) {
+            remove_wall_between(maze, *current, next);
+            da_append(path, *current);
+            *current = next;
+            return;
+        }
+    }
+
+    if (path->count > 0) {
+        *current = da_pop(path);
+    } else {
+        da_append(backtracked, *current);
     }
 }
 
@@ -216,8 +263,9 @@ int main() {
     ///////////////////
     typedef enum {
         STATE_MENU,
-        STATE_INFO,
         STATE_GAME,
+        STATE_INFO,
+        STATE_USER,
         STATE_EXIT,
     } game_states;
 
@@ -230,13 +278,7 @@ int main() {
     // init obj
     //////////////
 
-    // Initialize: Set all cells as walls
-    for (int i = 0; i < ROW; i++) {
-        for (int j = 0; j < COL; j++) {
-            maze[i][j] = 1;
-            visited[i][j] = false;
-        }
-    }
+    
 
     ////////////////
     // Main loop
@@ -261,6 +303,12 @@ int main() {
         "exit",
     };
 
+    // Item user
+    const char *item_user[2] = {
+        "> USER <",
+        "user",
+    };
+
     while (!EXIT) {
 
         // Color
@@ -274,7 +322,7 @@ int main() {
         if (key_pressed == KEY_UP)   menu_item--;
         if (key_pressed == KEY_DOWN) menu_item++;
 
-        if (menu_item >= 2) menu_item = 2;
+        if (menu_item >= 3) menu_item = 3;
         if (menu_item <= 0) menu_item = 0;
 
         // In menu state
@@ -291,13 +339,19 @@ int main() {
                 int select_start_game = menu_item == 0 ? 0 : 1;
                 mvprintw(h/2 - logo_h_size + 9, w/2 - str_len(item_start_game[select_start_game])/2, "%s", item_start_game[select_start_game]);
 
-                // Item info
-                int select_info = menu_item == 1 ? 0 : 1;
-                mvprintw(h/2 - logo_h_size + 11, w/2 - str_len(item_info[select_info])/2, "%s", item_info[select_info]);
-
                 // Item exit
-                int select_exit = menu_item == 2 ? 0 : 1;
-                mvprintw(h/2 - logo_h_size + 13, w/2 - str_len(item_exit[select_exit])/2, "%s", item_exit[select_exit]);
+                int select_user = menu_item == 1 ? 0 : 1;
+                mvprintw(h/2 - logo_h_size + 11, w/2 - str_len(item_user[select_user])/2, "%s", item_user[select_user]);
+                
+
+                // Item user
+                int select_info = menu_item == 2 ? 0 : 1;
+                mvprintw(h/2 - logo_h_size + 13, w/2 - str_len(item_info[select_info])/2, "%s", item_info[select_info]);
+
+                // Item info
+                int select_exit = menu_item == 3 ? 0 : 1;
+                mvprintw(h/2 - logo_h_size + 15, w/2 - str_len(item_exit[select_exit])/2, "%s", item_exit[select_exit]);
+
 
                 // By dev
                 mvprintw(h-2, 2, "%s", "Develop: hyunsu, eunhye");
@@ -316,10 +370,14 @@ int main() {
                         
                         case 1:
                             // Info page is dev
-                            current_state = STATE_INFO;
+                            current_state = STATE_USER;
                         break;
 
                         case 2:
+                            current_state = STATE_INFO;
+                        break;
+
+                        case 3:
                             current_state = STATE_EXIT;
                         break;
                     }
@@ -330,20 +388,30 @@ int main() {
             case STATE_INFO:
                 static int len_xoff = 31;
                 static int len_yoff = 2;
-                mvprintw(h/2-len_yoff,   w/2-len_xoff, "%s", "This is a small game written in C.");
-                mvprintw(h/2-len_yoff+1, w/2-len_xoff, "%s", "Your task is to collect all the apples while avoiding enemies.");
-                mvprintw(h/2-len_yoff+2, w/2-len_xoff, "%s", "I wrote this game just for fun :)");
-                mvprintw(h/2-len_yoff+3, w/2-len_xoff, "%s", "I do not recommend using the source code for learning C.");
-                mvprintw(h/2-len_yoff+4, w/2-len_xoff, "%s", "Have a good game!");
+                if (username[0] == '\0') {
+                    mvprintw(h/2-len_yoff-1, w/2-len_xoff, "Hello, new User :)");
+                    mvprintw(h/2-len_yoff,   w/2-len_xoff, "Your cleared up to Stage %d, score %d", level, score);
+                    mvprintw(h/2-len_yoff+1, w/2-len_xoff, "First logged in on: __"); // used utmp
+                    mvprintw(h/2-len_yoff+4, w/2-len_xoff, "------ Have a good game! ------");
+                    mvprintw(h/2-len_yoff+5, w/2-len_xoff, "This project was conducted in the System Programming course at");
+                    mvprintw(h/2-len_yoff+6, w/2-len_xoff, "Kyungpook National University.");
+                } else {
+                    mvprintw(h/2-len_yoff-1, w/2-len_xoff, "Hello, %s", username);
+                    mvprintw(h/2-len_yoff,   w/2-len_xoff, "%s cleared up to Stage %d, score %d", username, level, score);
+                    mvprintw(h/2-len_yoff+1, w/2-len_xoff, "First logged in on: __"); // used utmp
+                    mvprintw(h/2-len_yoff+4, w/2-len_xoff, "------ Have a good game! ------");
+                    mvprintw(h/2-len_yoff+5, w/2-len_xoff, "This project was conducted in the System Programming course at");
+                    mvprintw(h/2-len_yoff+6, w/2-len_xoff, "Kyungpook National University.");
+                }
 
                 // To menu
                 mvprintw(h-4, w/2-ceil(len_xoff/2), "%s", "press 'q' to exit menu");
 
                 // By dev
-                mvprintw(h-2, 2, "%s", "Develop: uriid1");
+                mvprintw(h-2, 2, "%s", "Develop: hyunsu, eunhye");
 
                 box(stdscr, 0, 0);
-
+        
                 // Exit to menu
                 if (key_pressed == 'q') {
                     current_state = STATE_MENU;
@@ -351,12 +419,172 @@ int main() {
                 }
             break;
 
-            // Game
-            case STATE_GAME:
-                // level_init(level);
-                // draw_hud();
+            // User
+            case STATE_USER: {
+                int index = 0;
+                int ch;
                 box(stdscr, 0, 0);
-            break;
+                char input[11] = {0};
+
+                if (username[0] == '\0') {
+                    mvprintw(h / 2 - logo_h_size + 4, w / 2 - 35, "Hello ! new User :)");
+                    mvprintw(h / 2 - logo_h_size + 5, w / 2 - 35, "press 'y' to edit name");
+                    mvprintw(h / 2 - logo_h_size + 6, w / 2 - 35, "press 'q' to exit menu");
+                    // By dev
+                    mvprintw(h-2, 2, "%s", "Develop: hyunsu, eunhye");
+
+                    // User name edit or exit
+                    ch = wgetch(stdscr);
+                    if (ch == 'y') {
+                        while (1) {
+                            ch = wgetch(stdscr); // Use ncurses input function
+
+                            // Handle Enter key
+                            if (ch == '\n' || ch == '\r') {
+                                break; // End input
+                            }
+
+                            // Handle Backspace key
+                            if ((ch == 127 || ch == KEY_BACKSPACE) && index > 0) {
+                                index--;
+                                input[index] = '\0'; // Remove last character
+                            }
+                            // Handle valid character input
+                            else if (index < 10 && ch >= 32 && ch <= 126) { // Printable ASCII range
+                                input[index++] = ch;
+                                input[index] = '\0'; // Null-terminate the string
+                            }
+                            
+                            // Clear and redraw input line
+                            mvprintw(h / 2 - logo_h_size + 4, w / 2 - 15, "Your Name :"); // Clear line
+                            mvprintw(h / 2 - logo_h_size + 4, w / 2 - 3, "                    "); // Clear line
+                            mvprintw(h / 2 - logo_h_size + 4, w / 2 - 3, "%s", input); // Redraw username
+                        }
+                        input[index] = '\0';
+                        strcpy(username, input);
+                        // Return to menu
+                        current_state = STATE_MENU;
+                        erase();
+                        break;
+                    } else if (ch == 'q') {
+                        current_state = STATE_MENU;
+                        erase();
+                    }
+                    break;
+                } else {
+                    mvprintw(h / 2 - logo_h_size + 3, w / 2 - 35, "Hello ! %s", username); // Clear line
+                    mvprintw(h / 2 - logo_h_size + 4, w / 2 - 35, "Would you like to edit your name?");
+                    mvprintw(h / 2 - logo_h_size + 5, w / 2 - 35, "press 'y' to edit name");
+                    mvprintw(h / 2 - logo_h_size + 6, w / 2 - 35, "press 'q' to exit menu");
+                    // By dev
+                    mvprintw(h-2, 2, "%s", "Develop: hyunsu, eunhye");
+                    
+                    // User name edit or exit
+                    ch = wgetch(stdscr);
+                    if (ch == 'y') {
+                        while (1) {
+                            ch = wgetch(stdscr); // Use ncurses input function
+
+                            // Handle Enter key
+                            if (ch == '\n' || ch == '\r') {
+                                break; // End input
+                            }
+
+                            // Handle Backspace key
+                            if ((ch == 127 || ch == KEY_BACKSPACE) && index > 0) {
+                                index--;
+                                input[index] = '\0'; // Remove last character
+                            }
+                            // Handle valid character input
+                            else if (index < 10 && ch >= 32 && ch <= 126) { // Printable ASCII range
+                                input[index++] = ch;
+                                input[index] = '\0'; // Null-terminate the string
+                            }
+                            
+                            // Clear and redraw input line
+                            mvprintw(h / 2 - logo_h_size + 3, w / 2 - 15, "Your Name :"); // Clear line
+                            mvprintw(h / 2 - logo_h_size + 3, w / 2 - 3, "                    "); // Clear line
+                            mvprintw(h / 2 - logo_h_size + 3, w / 2 - 3, "%s", input); // Redraw username
+                        }
+                        input[index] = '\0';
+                        strcpy(username, input);
+                        // Return to menu
+                        current_state = STATE_MENU;
+                        erase();
+                        break;
+                    } else if (ch == 'q') {
+                        current_state = STATE_MENU;
+                        erase();
+                    }
+                    break;
+                }
+            }
+
+            // Game
+            case STATE_GAME: {
+                static Maze maze;
+                static Point current;
+                static PointList visited, path, backtracked;
+                static bool initialized = false;
+
+                if (!initialized) {
+                    maze.width = maze_width;  // 사용자 입력값 사용
+                    maze.height = maze_height;
+                    maze.right_walls = calloc(maze.width * maze.height, sizeof(bool));
+                    maze.down_walls = calloc(maze.width * maze.height, sizeof(bool));
+                    enable_all_walls(&maze);
+
+                    current.x = 0;
+                    current.y = 0;
+                    visited = make_list(maze.width * maze.height);
+                    path = make_list(maze.width * maze.height);
+                    backtracked = make_list(maze.width * maze.height);
+
+                    initialized = true;
+                }
+
+                // Draw the maze
+                for (int j = 0; j < maze.height; j++) {
+                    for (int i = 0; i < maze.width; i++) {
+                        int x = i * 2;
+                        int y = j * 2 + 5;
+
+                        // Draw the cell
+                        mvprintw(y + 1, x, " ");
+
+                        // Draw the right wall
+                        if (i < maze.width - 1 && maze.right_walls[i + j * maze.width]) {
+                            mvprintw(y + 1, x + 1, "|");
+                        }
+
+                        // Draw the bottom wall
+                        if (j < maze.height - 1 && maze.down_walls[i + j * maze.width]) {
+                            mvprintw(y + 2, x, "_");
+                        }
+
+                        
+                    }
+                }
+
+                // Handle input for maze generation
+                while (visited.count < maze.width * maze.height) {
+                    maze_gen_step(&maze, &current, &visited, &path, &backtracked);
+                }
+                
+                if (key_pressed == 'q') {
+                    current_state = STATE_MENU;
+                    initialized = false;
+                    free(maze.right_walls);
+                    free(maze.down_walls);
+                    free(visited.items);
+                    free(path.items);
+                    free(backtracked.items);
+                    erase();
+                }
+
+                box(stdscr, 0, 0);
+                break;
+            }
 
             // Exit
             case STATE_EXIT:
