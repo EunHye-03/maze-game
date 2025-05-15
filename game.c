@@ -51,8 +51,8 @@ short lifes = 3;            // Player lives
 int star_in_level = 0;      // Stars in the level
 int current_lvl_x, current_lvl_y; // Level size
 int w, h;                   // Window width and height
-int maze_width = 60;  // 기본 가로 크기
-int maze_height = 10; // 기본 세로 크기
+int maze_width = 60;        // Default maze width
+int maze_height = 10;       // Default maze height
 
 ////////////////////
 // Utility Functions
@@ -113,14 +113,14 @@ void obj_init();
 /////////////
 // PLAYER
 ////////////
-// Playes method move
+// Player movement variables
 int dir_x;
 int dir_y;
 int dir_shoot;
 
 void player_move();
 
-// Collsiion
+// Collision
 void player_collision();
 
 
@@ -128,7 +128,7 @@ void player_collision();
 // Maze Functions
 ////////////////////
 
-// Add the Maze structure and related functions
+// Maze structure and related functions
 typedef struct Maze {
     int width;
     int height;
@@ -175,6 +175,7 @@ void enable_all_walls(Maze *maze) {
     memset(maze->down_walls, 1, sizeof(bool) * n_cells);
 }
 
+// Remove wall between two cells
 void remove_wall_between(Maze *maze, Point old, Point new) {
     if (old.x + 1 == new.x) {
         maze->right_walls[old.x + old.y * maze->width] = false; // Remove right wall of old
@@ -197,6 +198,7 @@ bool list_contains(PointList list, Point point) {
     return false;
 }
 
+// Maze generation step
 void maze_gen_step(Maze *maze, Point *current, PointList *visited, PointList *path, PointList *backtracked) {
     if (!list_contains(*visited, *current)) {
         da_append(visited, *current);
@@ -230,7 +232,7 @@ void maze_gen_step(Maze *maze, Point *current, PointList *visited, PointList *pa
     }
 }
 
-// 포탈 위치를 저장할 구조체
+// Structure for portal position
 typedef struct {
     int x;
     int y;
@@ -238,9 +240,9 @@ typedef struct {
 
 Portal portal;
 
-// 미로 내 통로(벽이 없는 곳)에 플레이어와 적, 포탈을 배치
+// Place player, enemies, and portal in maze paths
 void place_player_and_enemies(Maze *maze, struct class_obj *player, struct class_obj *enemy, int enemy_count) {
-    // 플레이어를 미로 내 첫 번째 통로(벽이 없는 곳)에 배치
+    // Place player at the first path cell found in the maze
     for (int y = 0; y < maze->height; y++) {
         for (int x = 0; x < maze->width; x++) {
             int idx = x + y * maze->width;
@@ -250,10 +252,10 @@ void place_player_and_enemies(Maze *maze, struct class_obj *player, struct class
             if (is_path) {
                 player->x = x;
                 player->y = y;
-                // 포탈 위치 계산 (플레이어 위치의 대칭)
+                // Calculate portal position (symmetric to player)
                 int px = maze->width - 1 - x;
                 int py = maze->height - 1 - y;
-                // 포탈도 반드시 통로에 위치해야 함
+                // Portal must also be on a path
                 while (1) {
                     int pidx = px + py * maze->width;
                     bool portal_path = true;
@@ -264,7 +266,7 @@ void place_player_and_enemies(Maze *maze, struct class_obj *player, struct class
                         portal.y = py;
                         break;
                     }
-                    // 대칭 위치가 통로가 아니면 한 칸씩 앞으로 이동
+                    // If symmetric position is not a path, move closer to (0,0)
                     if (px > 0) px--;
                     if (py > 0) py--;
                 }
@@ -273,7 +275,7 @@ void place_player_and_enemies(Maze *maze, struct class_obj *player, struct class
         }
     }
 enemy_place:
-    // 적을 랜덤한 통로에 배치 (중복 방지, 플레이어/포탈 위치 제외)
+    // Place enemies at random path cells (not overlapping player/portal)
     int placed = 0;
     while (placed < enemy_count) {
         int x = rand() % maze->width;
@@ -298,37 +300,37 @@ enemy_place:
     }
 }
 
-// 플레이어가 이동 가능한지 체크
+// Check if player can move to the next cell
 bool can_move_player(Maze *maze, int x, int y, int dx, int dy) {
     int nx = x + dx;
     int ny = y + dy;
     if (nx < 0 || nx >= maze->width || ny < 0 || ny >= maze->height) return false;
-    if (dx == -1 && maze->right_walls[(x-1) + y * maze->width]) return false; // 왼쪽
-    if (dx == 1 && maze->right_walls[x + y * maze->width]) return false; // 오른쪽
-    if (dy == -1 && maze->down_walls[x + (y-1) * maze->width]) return false; // 위
-    if (dy == 1 && maze->down_walls[x + y * maze->width]) return false; // 아래
+    if (dx == -1 && maze->right_walls[(x-1) + y * maze->width]) return false; // Left
+    if (dx == 1 && maze->right_walls[x + y * maze->width]) return false; // Right
+    if (dy == -1 && maze->down_walls[x + (y-1) * maze->width]) return false; // Up
+    if (dy == 1 && maze->down_walls[x + y * maze->width]) return false; // Down
     return true;
 }
 
-// 적이 이동 가능한 방향 중 랜덤하게 한 칸 이동
+// Move enemy one step in a random valid direction
 void move_enemy(struct class_obj *enemy, Maze *maze) {
-    int dirs[4][2] = { {0,-1}, {0,1}, {-1,0}, {1,0} }; // 상하좌우
+    int dirs[4][2] = { {0,-1}, {0,1}, {-1,0}, {1,0} }; // Up, Down, Left, Right
     int valid[4] = {0,};
     int valid_count = 0;
     int x = enemy->x;
     int y = enemy->y;
 
-    // 이동 가능한 방향 찾기
-    if (y > 0 && (maze->down_walls[x + (y-1) * maze->width] == false)) { // 위
+    // Find valid directions
+    if (y > 0 && (maze->down_walls[x + (y-1) * maze->width] == false)) { // Up
         valid[valid_count++] = 0;
     }
-    if (y < maze->height-1 && (maze->down_walls[x + y * maze->width] == false)) { // 아래
+    if (y < maze->height-1 && (maze->down_walls[x + y * maze->width] == false)) { // Down
         valid[valid_count++] = 1;
     }
-    if (x > 0 && (maze->right_walls[(x-1) + y * maze->width] == false)) { // 왼쪽
+    if (x > 0 && (maze->right_walls[(x-1) + y * maze->width] == false)) { // Left
         valid[valid_count++] = 2;
     }
-    if (x < maze->width-1 && (maze->right_walls[x + y * maze->width] == false)) { // 오른쪽
+    if (x < maze->width-1 && (maze->right_walls[x + y * maze->width] == false)) { // Right
         valid[valid_count++] = 3;
     }
 
@@ -371,12 +373,12 @@ int get_logo_w_size(void) {
 
 int logo_w_size = 1;
 void draw_logo(int h, int w) {  
-    // Get w size
+    // Get logo width
     if (logo_w_size == 1) {
         logo_w_size = get_logo_w_size() / 2;
     }
 
-    // Draw
+    // Draw logo
     attron(COLOR_PAIR(c_hud));
     for (int i = 0; i < logo_h_size; i++) {
         mvprintw(3 + i /* Logo Y pos */, w / 2 - logo_w_size, "%s", menu_logo[i]);
@@ -419,37 +421,30 @@ int main() {
     game_states current_state;
     current_state = STATE_MENU;
 
-
     //////////////
     // init obj
     //////////////
-
-    
 
     ////////////////
     // Main loop
     ///////////////
 
-    // Menu item
-    // Item start game
+    // Menu items
     const char *item_start_game[2] = {
         "> START GAME <",
         "start game",
     };
 
-    // Item info
     const char *item_info[2] = {
         "> INFO <",
         "info",
     };
 
-    // Item exit
     const char *item_exit[2] = {
         "> EXIT <",
         "exit",
     };
 
-    // Item user
     const char *item_user[2] = {
         "> USER <",
         "user",
@@ -457,10 +452,10 @@ int main() {
 
     while (!EXIT) {
 
-        // Color
+        // Set color
         SetColor();
 
-        // Get window width & Height
+        // Get window width & height
         getmaxyx(stdscr, h, w);
 
         // Menu state
@@ -475,29 +470,21 @@ int main() {
         switch(current_state) {
             // Menu
             case STATE_MENU:
-                // Logo
+                // Draw logo
                 draw_logo(h, w);
 
-                ///////////
-                // Items
-                //////////
-                // Item start game
+                // Draw menu items
                 int select_start_game = menu_item == 0 ? 0 : 1;
                 mvprintw(h/2 - logo_h_size + 9, w/2 - str_len(item_start_game[select_start_game])/2, "%s", item_start_game[select_start_game]);
 
-                // Item exit
                 int select_user = menu_item == 1 ? 0 : 1;
                 mvprintw(h/2 - logo_h_size + 11, w/2 - str_len(item_user[select_user])/2, "%s", item_user[select_user]);
                 
-
-                // Item user
                 int select_info = menu_item == 2 ? 0 : 1;
                 mvprintw(h/2 - logo_h_size + 13, w/2 - str_len(item_info[select_info])/2, "%s", item_info[select_info]);
 
-                // Item info
                 int select_exit = menu_item == 3 ? 0 : 1;
                 mvprintw(h/2 - logo_h_size + 15, w/2 - str_len(item_exit[select_exit])/2, "%s", item_exit[select_exit]);
-
 
                 // By dev
                 mvprintw(h-2, 2, "%s", "Develop: hyunsu, eunhye");
@@ -515,7 +502,6 @@ int main() {
                         break;
                         
                         case 1:
-                            // Info page is dev
                             current_state = STATE_USER;
                         break;
 
@@ -537,14 +523,14 @@ int main() {
                 if (username[0] == '\0') {
                     mvprintw(h/2-len_yoff-1, w/2-len_xoff, "Hello, new User :)");
                     mvprintw(h/2-len_yoff,   w/2-len_xoff, "Your cleared up to Stage %d, score %d", level, score);
-                    mvprintw(h/2-len_yoff+1, w/2-len_xoff, "First logged in on: __"); // used utmp
+                    mvprintw(h/2-len_yoff+1, w/2-len_xoff, "First logged in on: __"); // use utmp
                     mvprintw(h/2-len_yoff+4, w/2-len_xoff, "------ Have a good game! ------");
                     mvprintw(h/2-len_yoff+5, w/2-len_xoff, "This project was conducted in the System Programming course at");
                     mvprintw(h/2-len_yoff+6, w/2-len_xoff, "Kyungpook National University.");
                 } else {
                     mvprintw(h/2-len_yoff-1, w/2-len_xoff, "Hello, %s", username);
                     mvprintw(h/2-len_yoff,   w/2-len_xoff, "%s cleared up to Stage %d, score %d", username, level, score);
-                    mvprintw(h/2-len_yoff+1, w/2-len_xoff, "First logged in on: __"); // used utmp
+                    mvprintw(h/2-len_yoff+1, w/2-len_xoff, "First logged in on: __"); // use utmp
                     mvprintw(h/2-len_yoff+4, w/2-len_xoff, "------ Have a good game! ------");
                     mvprintw(h/2-len_yoff+5, w/2-len_xoff, "This project was conducted in the System Programming course at");
                     mvprintw(h/2-len_yoff+6, w/2-len_xoff, "Kyungpook National University.");
@@ -693,18 +679,18 @@ int main() {
                     placed = false;
                 }
 
-                // 미로 완성될 때까지 생성
+                // Generate maze until complete
                 while (visited.count < maze.width * maze.height) {
                     maze_gen_step(&maze, &current, &visited, &path, &backtracked);
                 }
 
-                // 미로가 완성된 후 플레이어/적 배치 (한 번만)
+                // Place player and enemies after maze is generated (only once)
                 if (!placed) {
                     place_player_and_enemies(&maze, &player, enemy, 5);
                     placed = true;
                 }
 
-                // 플레이어 이동 처리
+                // Movement Player
                 int dx = 0, dy = 0;
                 if (key_pressed == KEY_UP) dy = -1;
                 else if (key_pressed == KEY_DOWN) dy = 1;
@@ -716,7 +702,7 @@ int main() {
                     player.y += dy;
                 }
 
-                // 적 이동 (더 느리게, usleep 사용)
+                // Movement Enemy
                 tick++;
                 enemy_move_tick++;
                 if (enemy_move_tick >= 15) {
@@ -732,21 +718,21 @@ int main() {
                         int x = i * 2;
                         int y = j * 2 + 5;
 
-                        // 포탈 표시
+                        // Display portal
                         if (portal.x == i && portal.y == j) {
-                            mvprintw(y + 1, x, "O"); // 포탈
+                            mvprintw(y + 1, x, "O"); // Portal
                             continue;
                         }
 
-                        // 플레이어/적 표시
+                        // Display player and enemies
                         bool drawn = false;
                         if (player.x == i && player.y == j) {
-                            mvprintw(y + 1, x, "@"); // 플레이어
+                            mvprintw(y + 1, x, "@"); // Player
                             drawn = true;
                         } else {
                             for (int e = 0; e < 5; e++) {
                                 if (enemy[e].x == i && enemy[e].y == j) {
-                                    mvprintw(y + 1, x, "E"); // 적
+                                    mvprintw(y + 1, x, "X"); // Enemy
                                     drawn = true;
                                     break;
                                 }
@@ -768,15 +754,13 @@ int main() {
                     }
                 }
 
-                // 포탈에 도달하면 다음 레벨로 이동
+                // If player reaches portal, go to next level
                 if (player.x == portal.x && player.y == portal.y) {
-                    // 레벨 증가, 미로 크기 증가(원하면), 상태 초기화
                     level++;
                     maze_width += 2;
                     maze_height += 1;
                     if (maze_width > 80) maze_width = 80;
                     if (maze_height > 25) maze_height = 25;
-                    // 리셋
                     initialized = false;
                     placed = false;
                     erase();
@@ -795,8 +779,7 @@ int main() {
                     erase();
                 }
 
-                // 느리게 보이도록 usleep 사용 (전체 루프 속도 조절)
-                usleep(30000); // 30ms 대기, 값을 늘리면 더 느려짐
+                usleep(30000); // pause 30ms
 
                 box(stdscr, 0, 0);
                 break;
