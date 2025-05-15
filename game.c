@@ -240,63 +240,76 @@ typedef struct {
 
 Portal portal;
 
-// Place player, enemies, and portal in maze paths
-void place_player_and_enemies(Maze *maze, struct class_obj *player, struct class_obj *enemy, int enemy_count) {
-    // Place player at the first path cell found in the maze
-    for (int y = 0; y < maze->height; y++) {
-        for (int x = 0; x < maze->width; x++) {
-            int idx = x + y * maze->width;
-            bool is_path = true;
-            if (x < maze->width - 1 && maze->right_walls[idx]) is_path = false;
-            if (y < maze->height - 1 && maze->down_walls[idx]) is_path = false;
-            if (is_path) {
-                player->x = x;
-                player->y = y;
-                // Calculate portal position (symmetric to player)
-                int px = maze->width - 1 - x;
-                int py = maze->height - 1 - y;
-                // Portal must also be on a path
-                while (1) {
-                    int pidx = px + py * maze->width;
-                    bool portal_path = true;
-                    if (px < maze->width - 1 && maze->right_walls[pidx]) portal_path = false;
-                    if (py < maze->height - 1 && maze->down_walls[pidx]) portal_path = false;
-                    if (portal_path && !(px == player->x && py == player->y)) {
-                        portal.x = px;
-                        portal.y = py;
-                        break;
-                    }
-                    // If symmetric position is not a path, move closer to (0,0)
-                    if (px > 0) px--;
-                    if (py > 0) py--;
-                }
-                goto enemy_place;
-            }
+// Helper function: Check if a cell is a valid path
+bool is_valid_path(Maze *maze, int x, int y) {
+    int idx = x + y * maze->width;
+    if (x < maze->width - 1 && maze->right_walls[idx]) return false;
+    if (y < maze->height - 1 && maze->down_walls[idx]) return false;
+    return true;
+}
+
+// Helper function: Place a portal based on the player's position
+Point place_portal(Maze *maze, Point player_pos) {
+    Point portal_pos = { maze->width - 1 - player_pos.x, maze->height - 1 - player_pos.y };
+    while (1) {
+        int pidx = portal_pos.x + portal_pos.y * maze->width;
+        if (is_valid_path(maze, portal_pos.x, portal_pos.y) &&
+            !(portal_pos.x == player_pos.x && portal_pos.y == player_pos.y)) {
+            break;
         }
+        // Adjust portal position closer to (0,0) if invalid
+        if (portal_pos.x > 0) portal_pos.x--;
+        if (portal_pos.y > 0) portal_pos.y--;
     }
-enemy_place:
-    // Place enemies at random path cells (not overlapping player/portal)
+    return portal_pos;
+}
+
+// Helper function: Place enemies randomly
+void place_enemies(Maze *maze, struct class_obj *enemies, int enemy_count, Point player_pos, Point portal_pos) {
     int placed = 0;
     while (placed < enemy_count) {
         int x = rand() % maze->width;
         int y = rand() % maze->height;
-        int idx = x + y * maze->width;
-        bool is_path = true;
-        if (x < maze->width - 1 && maze->right_walls[idx]) is_path = false;
-        if (y < maze->height - 1 && maze->down_walls[idx]) is_path = false;
-        if (!is_path) continue;
-        if ((x == player->x && y == player->y) || (x == portal.x && y == portal.y)) continue;
+        if (!is_valid_path(maze, x, y)) continue;
+        if ((x == player_pos.x && y == player_pos.y) || (x == portal_pos.x && y == portal_pos.y)) continue;
+
+        // Check for overlap with already placed enemies
         bool overlap = false;
         for (int i = 0; i < placed; i++) {
-            if (enemy[i].x == x && enemy[i].y == y) {
+            if (enemies[i].x == x && enemies[i].y == y) {
                 overlap = true;
                 break;
             }
         }
         if (overlap) continue;
-        enemy[placed].x = x;
-        enemy[placed].y = y;
+
+        // Place enemy
+        enemies[placed].x = x;
+        enemies[placed].y = y;
         placed++;
+    }
+}
+
+// Main function: Place player, enemies, and portal
+void place_player_and_enemies(Maze *maze, struct class_obj *player, struct class_obj *enemies, int enemy_count) {
+    // Place player at the first valid path cell
+    for (int y = 0; y < maze->height; y++) {
+        for (int x = 0; x < maze->width; x++) {
+            if (is_valid_path(maze, x, y)) {
+                player->x = x;
+                player->y = y;
+
+                // Place portal symmetrically to the player
+                Point player_pos = { x, y };
+                Point portal_pos = place_portal(maze, player_pos);
+                portal.x = portal_pos.x;
+                portal.y = portal_pos.y;
+
+                // Place enemies
+                place_enemies(maze, enemies, enemy_count, player_pos, portal_pos);
+                return; // All placements done
+            }
+        }
     }
 }
 
@@ -712,6 +725,22 @@ int main() {
                     enemy_move_tick = 0;
                 }
 
+                // Check collision: if player meets any enemy, go to main menu
+                for (int e = 0; e < 5; e++) {
+                    if (player.x == enemy[e].x && player.y == enemy[e].y) {
+                        current_state = STATE_MENU;
+                        initialized = false;
+                        placed = false;
+                        free(maze.right_walls);
+                        free(maze.down_walls);
+                        free(visited.items);
+                        free(path.items);
+                        free(backtracked.items);
+                        erase();
+                        goto after_game_case; // break out of the drawing loop
+                    }
+                }
+
                 // Draw the maze
                 for (int j = 0; j < maze.height; j++) {
                     for (int i = 0; i < maze.width; i++) {
@@ -782,6 +811,7 @@ int main() {
                 usleep(30000); // pause 30ms
 
                 box(stdscr, 0, 0);
+after_game_case:
                 break;
             }
 

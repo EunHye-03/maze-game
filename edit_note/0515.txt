@@ -1,0 +1,16 @@
+add :
+
+1. Maze구조체 : Maze Functions에 첫번째로 선언된 구조체로
+// Maze structure and related functions
+typedef struct Maze {
+    int width;
+    int height;
+    bool *right_walls;
+    bool *down_walls;
+} Maze;
+
+다음 모양을 가지고 있으며, width는 미로의 넓이, height는 미로의 높이를 나타낸 것입니다.
+아래 bool 타입 두개는 미로의 수평 수직 상태를 저장한 것입니다.
+bool 타입으로 선언된 *right_walls은 어떤 사이즈를 받더라도 동적으로 할당하기 위하여 '포인터'로 선언한 것입니다.
+                 *down_walls도 마찬가지입니다.
+
