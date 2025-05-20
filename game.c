@@ -443,24 +443,11 @@ int main() {
     ///////////////
 
     // Menu items
-    const char *item_start_game[2] = {
-        "> START GAME <",
-        "start game",
-    };
-
-    const char *item_info[2] = {
-        "> INFO <",
-        "info",
-    };
-
-    const char *item_exit[2] = {
-        "> EXIT <",
-        "exit",
-    };
-
-    const char *item_user[2] = {
-        "> USER <",
-        "user",
+    const char* menu_items[4][2] = {
+        {"> START GAME <",  "start game"},
+        {"> USER <",        "user"},
+        {"> INFO <",        "info"},
+        {"> EXIT <",        "exit"}
     };
 
     while (!EXIT) {
@@ -487,17 +474,13 @@ int main() {
                 draw_logo(h, w);
 
                 // Draw menu items
-                int select_start_game = menu_item == 0 ? 0 : 1;
-                mvprintw(h/2 - logo_h_size + 9, w/2 - str_len(item_start_game[select_start_game])/2, "%s", item_start_game[select_start_game]);
+                for (int i = 0; i < 4; i++) {
+                    int is_seleced = (menu_item == i) ? 0 : 1;
+                    int y = h/2 - logo_h_size + 9 + i * 2;
+                    int x = w/2 - str_len(menu_items[i][is_seleced]) / 2;
+                    mvprintw(y, x, "%s", menu_items[i][is_seleced]);
+                }
 
-                int select_user = menu_item == 1 ? 0 : 1;
-                mvprintw(h/2 - logo_h_size + 11, w/2 - str_len(item_user[select_user])/2, "%s", item_user[select_user]);
-                
-                int select_info = menu_item == 2 ? 0 : 1;
-                mvprintw(h/2 - logo_h_size + 13, w/2 - str_len(item_info[select_info])/2, "%s", item_info[select_info]);
-
-                int select_exit = menu_item == 3 ? 0 : 1;
-                mvprintw(h/2 - logo_h_size + 15, w/2 - str_len(item_exit[select_exit])/2, "%s", item_exit[select_exit]);
 
                 // By dev
                 mvprintw(h-2, 2, "%s", "Develop: hyunsu, eunhye");
