@@ -1,1 +1,5 @@
-maze
+assets/save/*
+!assets/save/.gitkeep
+maze_game
+serviceAccountKey.json
+.env
