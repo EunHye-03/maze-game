@@ -12,12 +12,21 @@ extern short level;
 extern short score;
 extern short lifes;
 
-#define MAZE_WIDTH 41
-#define MAZE_HEIGHT 23
+extern int px, py;
+extern int player_has_key;
+extern int player_has_breaker;
+extern int player_speed;
 
-void start_maze_game();
-void generate_maze(int y, int x);
-void draw_maze();
+#define MAZE_WIDTH 45
+#define MAZE_HEIGHT 29
+
+void start_maze_game(void);
+void choose_player_style(void);
+void apply_style_effects(void);
+void handle_player_input(void);
+void update_game_state(void);
+void draw_maze(void);
+void draw_status_bar(void);
 
 extern char maze[MAZE_HEIGHT][MAZE_WIDTH];
 extern int player_has_key;
@@ -40,5 +49,18 @@ typedef struct {
     char symbol[20];
     int x, y;
 } GameObject;
+
+typedef enum {
+    STYLE_SPEEDSTER,   // 속도 +1
+    STYLE_TANK,        // 생명 +1
+    STYLE_HACKER,      // 열쇠 없이 포탈 가능
+    STYLE_BREAKER,     // 시작 시 벽 부수기 아이템 보유
+    STYLE_TRICKSTER,   // 미스터리 박스 효과 향상
+    STYLE_COUNT
+} PlayerStyle;
+
+#ifndef ABS
+#define ABS(x) ((x) < 0 ? -(x) : (x))
+#endif
 
 #endif

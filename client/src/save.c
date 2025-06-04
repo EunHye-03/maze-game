@@ -22,15 +22,12 @@ typedef struct {
     short lifes;
 } SaveData;
 
-bool save_game() {
-    // 저장 디렉토리가 없다면 생성
+bool save_game(const char* filename) {
     struct stat st = {0};
-    if (stat(SAVE_DIR, &st) == -1) {
-        mkdir(SAVE_DIR, 0700);
-    }
+    if (stat(SAVE_DIR, &st) == -1) mkdir(SAVE_DIR, 0700);
 
     char filepath[512];
-    snprintf(filepath, sizeof(filepath), "%s/%s", SAVE_DIR, SAVE_FILE);
+    snprintf(filepath, sizeof(filepath), "%s/%s", SAVE_DIR, filename);
 
     FILE *fp = fopen(filepath, "w");
     if (!fp) return false;
@@ -38,6 +35,57 @@ bool save_game() {
     fprintf(fp, "%s %d %d %d\n", g_username, level, score, lifes);
     fclose(fp);
     return true;
+}
+
+void list_save_files(char filenames[][256], int* count) {
+    *count = 0;
+    DIR *dp = opendir(SAVE_DIR);
+    if (!dp) return;
+
+    struct dirent *entry;
+
+    while ((entry = readdir(dp)) != NULL) {
+        // 숨김 파일 제외
+        if (entry->d_name[0] == '.') continue;
+
+        char fullpath[512];
+        snprintf(fullpath, sizeof(fullpath), "%s/%s", SAVE_DIR, entry->d_name);
+
+        struct stat st;
+        if (stat(fullpath, &st) == 0 && S_ISREG(st.st_mode)) {
+            // .txt 파일만 필터링
+            if (strstr(entry->d_name, ".txt")) {
+                strncpy(filenames[*count], entry->d_name, 255);
+                filenames[*count][255] = '\0';
+                (*count)++;
+            }
+        }
+    }
+
+    closedir(dp);
+}
+
+
+int load_specific_game(const char* filename) {
+    char filepath[512];
+    snprintf(filepath, sizeof(filepath), "%s/%s", SAVE_DIR, filename);
+
+    FILE *fp = fopen(filepath, "r");
+    if (!fp) return 0;
+
+    char name[32];
+    int lvl, scr, life;
+    if (fscanf(fp, "%31s %d %d %d", name, &lvl, &scr, &life) == 4) {
+        strncpy(g_username, name, sizeof(g_username) - 1);
+        level = lvl;
+        score = scr;
+        lifes = life;
+        fclose(fp);
+        return 1;
+    }
+
+    fclose(fp);
+    return 0;
 }
 
 int load_game() {

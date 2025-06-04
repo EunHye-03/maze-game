@@ -21,6 +21,13 @@ void init_colors() {
     init_pair(COLOR_HUD, COLOR_WHITE, COLOR_BLACK);
     init_pair(2, COLOR_WHITE, COLOR_BLACK); // title
     init_pair(3, COLOR_CYAN, COLOR_BLACK);  // text
+    init_pair(4, COLOR_YELLOW, COLOR_BLACK);  // Key
+    init_pair(5, COLOR_GREEN, COLOR_BLACK);   // Portal (opened)
+    init_pair(6, COLOR_RED, COLOR_BLACK);     // Portal (locked)
+    init_pair(7, COLOR_MAGENTA, COLOR_BLACK); // Breakable wall
+    init_pair(8, COLOR_BLUE, COLOR_BLACK);    // Player
+    init_pair(9, COLOR_WHITE, COLOR_BLACK);   // Normal wall
+    init_pair(10, COLOR_RED, COLOR_BLACK); // 적(E) 표시용
 }
 
 void check_terminal_size() {
@@ -102,7 +109,9 @@ void input_username_screen() {
         remove(old_path);  // 삭제 시도 (실패해도 무방)
     }
 
-    save_game();
+    char savefile[64];
+    snprintf(savefile, sizeof(savefile), "%s.txt", g_username);
+    save_game(savefile);
 
     noecho();
     curs_set(0);
@@ -159,6 +168,43 @@ void draw_logo() {
     attroff(A_BOLD);
     attroff(COLOR_PAIR(2));
 }
+
+void input_save_name_screen(char* output_name) {
+    timeout(-1);
+    echo();
+    curs_set(1);
+
+    erase();
+    getmaxyx(stdscr, g_height, g_width);
+    mvprintw(g_height / 2 - 2, g_width / 2 - 20, "Enter save name (max 31 chars):");
+    mvprintw(g_height / 2, g_width / 2 - 10, "> ");
+    refresh();
+
+    int idx = 0;
+    int x = g_width / 2 - 8;
+    move(g_height / 2, x);
+
+    int ch;
+    while ((ch = getch()) != '\n') {
+        if (isalnum(ch) && idx < 31) {
+            output_name[idx++] = ch;
+            mvaddch(g_height / 2, x++, ch);
+        } else if ((ch == KEY_BACKSPACE || ch == 127 || ch == '\b') && idx > 0) {
+            idx--;
+            x--;
+            output_name[idx] = '\0';
+            mvaddch(g_height / 2, x, ' ');
+            move(g_height / 2, x);
+        }
+        refresh();
+    }
+
+    output_name[idx] = '\0';
+    noecho();
+    curs_set(0);
+    timeout(0);
+}
+
 
 void draw_game_info_menu(int selected) {
     const char *items[] = {

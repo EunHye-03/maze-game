@@ -1,11 +1,14 @@
 #include <ncurses.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+#include <time.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include "game.h"
 #include "render.h"
 #include "save.h"
+#include "menu.h"
 
 int main() {
     initscr();
@@ -65,23 +68,15 @@ int main() {
                     if (info_key == KEY_UP) info_item = (info_item - 1 + 4) % 4;
                     else if (info_key == KEY_DOWN) info_item = (info_item + 1) % 4;
                     else if (info_key == '\n') {
+
                         switch (info_item) {
                             case 0:
-                                if (load_game()) {
-                                    mvprintw(g_height / 2 + 8, g_width / 2 - 6, "Load success!");
-                                } else {
-                                    mvprintw(g_height / 2 + 8, g_width / 2 - 6, "Load failed.");
-                                }
-                                refresh(); napms(800);
-                                break;
-                            case 1:
-                                save_game();
-                                mvprintw(g_height / 2 + 8, g_width / 2 - 8, "Saved successfully!");
-                                refresh(); napms(800);
+                                select_save_file_menu();
+                            case 1: // Save Game
+                                handle_save_game();
                                 break;
                             case 2:
-                                input_username_screen();
-                                intro_animation();
+                                handle_intro();
                                 break;
                             case 3:
                                 state = STATE_MENU;
@@ -96,47 +91,23 @@ int main() {
                 erase();
                 getmaxyx(stdscr, g_height, g_width);
 
-                mvprintw(g_height / 2 - 2, g_width / 2 - 25, "[ CURRENT PLAYER INFO ]");
-                mvprintw(g_height / 2, g_width / 2 - 30, "Username: %s", g_username);
-                mvprintw(g_height / 2 + 1, g_width / 2 - 30, "Level: %d", level);
-                mvprintw(g_height / 2 + 2, g_width / 2 - 30, "Score: %d", score);
-                mvprintw(g_height / 2 + 3, g_width / 2 - 30, "Lives: %d", lifes);
+                char title[] = "[ CURRENT PLAYER INFO ]";
+                char buf[100];
+                
+                // Title
+                mvprintw(g_height / 2 - 2, (g_width - strlen(title)) / 2, "%s", title);
 
-                struct dirent *entry;
-                DIR *dp = opendir("assets/save");
+                // Username
+                snprintf(buf, sizeof(buf), "Username: %s", g_username);
+                mvprintw(g_height / 2, (g_width - strlen(buf)) / 2, "%s", buf);
 
-                int list_y = g_height / 2 - 2;
-                int list_x = g_width / 2 + 5;
+                // Level
+                snprintf(buf, sizeof(buf), "Level: %d", level);
+                mvprintw(g_height / 2 + 1, (g_width - strlen(buf)) / 2, "%s", buf);
 
-                if (dp) {
-                    mvprintw(list_y - 2, list_x, "[ SAVED SCORES ]");
-                    while ((entry = readdir(dp)) != NULL) {
-                #ifdef DT_REG
-                        if (entry->d_type == DT_REG) {
-                #else
-                        struct stat st;
-                        char path[512];
-                        snprintf(path, sizeof(path), "assets/save/%s", entry->d_name);
-                        stat(path, &st);
-                        if (S_ISREG(st.st_mode)) {
-                #endif
-                            char path[512];
-                            snprintf(path, sizeof(path), "assets/save/%s", entry->d_name);
-                            FILE *fp = fopen(path, "r");
-                            if (fp) {
-                                char name[32];
-                                int saved_level, saved_score, saved_lifes;
-                                if (fscanf(fp, "%31s %d %d %d", name, &saved_level, &saved_score, &saved_lifes) == 4) {
-                                    mvprintw(list_y++, list_x, "%-10s  Score: %d", name, saved_score);
-                                }
-                                fclose(fp);
-                            }
-                        }
-                    }
-                    closedir(dp);
-                } else {
-                    mvprintw(list_y, list_x, "No saved users.");
-                }
+                // Score
+                snprintf(buf, sizeof(buf), "Score: %d", score);
+                mvprintw(g_height / 2 + 2, (g_width - strlen(buf)) / 2, "%s", buf);
 
                 mvprintw(g_height - 2, g_width / 2 - 15, "Press any key to return.");
                 refresh();
