@@ -19,13 +19,13 @@ const char *menu_logo[] = {
 
 void init_colors() {
     init_pair(COLOR_HUD, COLOR_WHITE, COLOR_BLACK);
-    init_pair(2, COLOR_WHITE, COLOR_BLACK); // title
-    init_pair(3, COLOR_CYAN, COLOR_BLACK);  // text
+    init_pair(2, COLOR_WHITE, COLOR_BLACK);   // title
+    init_pair(3, COLOR_CYAN, COLOR_BLACK);    // items
     init_pair(4, COLOR_YELLOW, COLOR_BLACK);  // Key
-    init_pair(5, COLOR_GREEN, COLOR_BLACK);   // Portal (opened)
-    init_pair(6, COLOR_RED, COLOR_BLACK);     // Portal (locked)
-    init_pair(7, COLOR_MAGENTA, COLOR_BLACK); // Breakable wall
-    init_pair(8, COLOR_BLUE, COLOR_BLACK);    // Player
+    init_pair(5, COLOR_GREEN, COLOR_BLACK);   // Portal
+    init_pair(6, COLOR_RED, COLOR_BLACK);     // enemy
+    init_pair(7, COLOR_MAGENTA, COLOR_BLACK); // Player
+    init_pair(8, COLOR_BLUE, COLOR_BLACK);    // 
     init_pair(9, COLOR_WHITE, COLOR_BLACK);   // Normal wall
     init_pair(10, COLOR_RED, COLOR_BLACK); // 적(E) 표시용
 }

@@ -339,23 +339,27 @@ void generate_maze(int y, int x) {
     }
 }
 
+int get_color_for_char(char ch) {
+    switch (ch) {
+        case '#': return 9; break;  // wall
+        case 'K': return 4; break;  // key
+        case 'X': return 6; break;  // enemy
+        case 'P': return 5; break;  // Portal
+        case 'B': return 3; break;  // Break wall
+        case 'S': return 3; break;  // switch
+        case 'D': return 3; break;  // door
+        case 'C': return 3; break;  // collapsing tile
+        case 'M': return 3; break;  // Push box
+        case '?': return 3; break;  // Mystery
+        default: return 0;
+    }
+}
+
 void draw_maze() {
     for (int y = 0; y < MAZE_HEIGHT; y++) {
         for (int x = 0; x < MAZE_WIDTH; x++) {
             char ch = maze[y][x];
-            int color = 0;
-            switch (ch) {
-                case '#': color = 9; break;
-                case 'K': color = 4; break;
-                case 'X': color = 6; break;
-                case 'P': color = 5; break;
-                case 'B': color = 3; break;
-                case 'S': color = 3; break;  // switch
-                case 'D': color = 3; break;  // door
-                case 'C': color = 3; break;  // collapsing tile
-                case 'M': color = 3; break;
-                case '?': color = 3; break;
-            }
+            int color = get_color_for_char(ch);
             if (color > 0) attron(COLOR_PAIR(color));
             mvprintw(center_y_offset + y + 1, center_x_offset + (x + 1) * 2, "%c ", ch);
             if (color > 0) attroff(COLOR_PAIR(color));
@@ -383,7 +387,7 @@ void draw_maze() {
     mvprintw(ui_y++, ui_x, "|     Maze Game UI       |");
     mvprintw(ui_y++, ui_x, "+------------------------+");
     mvprintw(ui_y++, ui_x, "| Level     : %-3d        |", level);
-    mvprintw(ui_y++, ui_x, "| Score     : %-3d        |", score);
+    mvprintw(ui_y++, ui_x, "| Score     : %-5d      |", score);
     mvprintw(ui_y++, ui_x, "| Lifes     : %-3d        |", lifes);
     mvprintw(ui_y++, ui_x, "| Time Left : %-3d        |", time_left);
     mvprintw(ui_y++, ui_x, "+------------------------+");
@@ -405,15 +409,77 @@ void draw_maze() {
 
     ui_y++;
     mvprintw(ui_y++, ui_x, "[Item Legend]");
-    mvprintw(ui_y++, ui_x, "'K' = Key");
-    mvprintw(ui_y++, ui_x, "'B' = Wall Breaker");
-    mvprintw(ui_y++, ui_x, "'S' = Switch, 'D' = Door");
-    mvprintw(ui_y++, ui_x, "'M' = Push Box (x)");
-    mvprintw(ui_y++, ui_x, "'?' = Mystery");
-    mvprintw(ui_y++, ui_x, "'C' = Collapsing Tile");
+
+    // 'K' = Key
+    mvprintw(ui_y, ui_x, "'");
+    attron(COLOR_PAIR(get_color_for_char('K')));
+    printw("K");
+    attroff(COLOR_PAIR(get_color_for_char('K')));
+    printw("' = key");
+    ui_y++;
+
+    // 'B' = Wall Breaker
+    mvprintw(ui_y, ui_x, "'");
+    attron(COLOR_PAIR(get_color_for_char('B')));
+    printw("B");
+    attroff(COLOR_PAIR(get_color_for_char('B')));
+    printw("' = Wall Breaker");
+    ui_y++;
+
+    // 'S' = Switch, 'D' = Door
+    mvprintw(ui_y, ui_x, "'");
+    attron(COLOR_PAIR(get_color_for_char('S')));
+    printw("S");
+    attroff(COLOR_PAIR(get_color_for_char('S')));
+    printw("' = Switch, '");
+    attron(COLOR_PAIR(get_color_for_char('D')));
+    printw("D");
+    attroff(COLOR_PAIR(get_color_for_char('D')));
+    printw("' = Door");
+    ui_y++;
+
+    // 'M' = Push Box (x)
+    mvprintw(ui_y, ui_x, "'");
+    attron(COLOR_PAIR(get_color_for_char('M')));
+    printw("M");
+    attroff(COLOR_PAIR(get_color_for_char('M')));
+    printw("' = Push Box (x)");
+    ui_y++;
+
+    // '?' = Mystery
+    mvprintw(ui_y, ui_x, "'");
+    attron(COLOR_PAIR(get_color_for_char('?')));
+    printw("?");
+    attroff(COLOR_PAIR(get_color_for_char('?')));
+    printw("' = Mystery");
+    ui_y++;
+
+    // 'C' = Collapsing Tile
+    mvprintw(ui_y, ui_x, "'");
+    attron(COLOR_PAIR(get_color_for_char('C')));
+    printw("C");
+    attroff(COLOR_PAIR(get_color_for_char('C')));
+    printw("' = Collapsing Tile");
+    ui_y++;
+
     mvprintw(ui_y++, ui_x, "'T' = +10 Time");
-    mvprintw(ui_y++, ui_x, "'P' = Portal");
-    mvprintw(ui_y++, ui_x, "'X' = Locked Portal");
+
+    // 'P' = Portal
+    mvprintw(ui_y, ui_x, "'");
+    attron(COLOR_PAIR(get_color_for_char('P')));
+    printw("P");
+    attroff(COLOR_PAIR(get_color_for_char('P')));
+    printw("' = Portal");
+    ui_y++;
+
+    // 'X' = Locked Portal
+    mvprintw(ui_y, ui_x, "'");
+    attron(COLOR_PAIR(get_color_for_char('X')));
+    printw("X");
+    attroff(COLOR_PAIR(get_color_for_char('X')));
+    printw("' = Locked Portal");
+    ui_y++;
+
     mvprintw(ui_y++, ui_x, "Reach 'P' in time!");
 
     mvprintw(ui_y++, ui_x, "+------------------------+");
