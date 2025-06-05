@@ -47,6 +47,62 @@ int has_push_item = false;  // M 아이템 획득 여부
 
 PlayerStyle player_style;
 
+#define MAX_BREAKER 5
+int breaker_count = 0;
+
+int boss_resisted_z = 0;
+time_t last_boss_item_time = 0;
+
+bool g_return_to_menu = false;
+
+void show_ending_credits() {
+    clear();
+
+    const char *logo[] = {
+        " # #       # #           #          # # # # # #   # # # # #",
+        " #   #   #   #         #   #                #     #",
+        " #     #     #      #    #    #           #       # # # # #",
+        " #           #    #            #        #         #",
+        " #           #  #                #  # # # # # #   # # # # #"
+    };
+
+    const char *message[] = {
+        "",
+        "Congratulations!",
+        "You have escaped the maze of death.",
+        "",
+        "Designed & Programmed by: IHyunSu & EunHye",
+        "",
+        "Thank you for playing.",
+        "",
+        "Press any key to return to the main menu..."
+    };
+
+    int logo_lines = sizeof(logo) / sizeof(logo[0]);
+    int msg_lines = sizeof(message) / sizeof(message[0]);
+    int total_lines = logo_lines + msg_lines + 2;
+
+    for (int i = 0; i < logo_lines; i++) {
+        mvprintw(LINES / 2 - total_lines / 2 + i, (COLS - strlen(logo[i])) / 2, "%s", logo[i]);
+    }
+
+    for (int i = 0; i < msg_lines; i++) {
+        mvprintw(LINES / 2 - total_lines / 2 + logo_lines + i + 2, (COLS - strlen(message[i])) / 2, "%s", message[i]);
+    }
+
+    refresh();
+    timeout(-1);
+    getch();
+}
+
+int get_boss_survive_time(int level) {
+    int base = 15;
+    int extra = (level / 5 - 1) * 3;  // 5레벨마다 +3초씩 증가
+    int result = base + extra;
+    if (result > 30) result = 30;    // 상한선: 30초
+    return result;
+}
+
 const char* style_names[] = {
     "Speedster (+10 speed)",
     "Tank (+1 life)",
@@ -80,6 +136,7 @@ void apply_player_style_effects() {
             break;
         case STYLE_BREAKER:
             player_has_breaker = true;
+            breaker_count = MAX_BREAKER; 
             break;
         case STYLE_TRICKSTER:
             // Mystery 효과 강화 → random_box_effect 내부에서 분기 필요
@@ -220,24 +277,17 @@ void pickup_breaker(int y, int x) {
 void activate_switch() {
     for (int y = 0; y < MAZE_HEIGHT; y++) {
         for (int x = 0; x < MAZE_WIDTH; x++) {
-            if (maze[y][x] == 'D')
-                maze[y][x] = ' ';
+            if (maze[y][x] == 'S') maze[y][x] = ' ';
+            if (maze[y][x] == 'D') maze[y][x] = ' ';
         }
     }
     mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "You activated a switch!");
 }
 
-void collapse_tile(int y, int x) {
-    maze[y][x] = '#';
-    px = x;
-    py = y;
-    mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "The path collapsed behind you!");
-}
-
 void pickup_push_item(int y, int x) {
     has_push_item = true;
     maze[y][x] = ' ';
-    mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Push item acquired! Press 'z'");
+    mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Wall phase acquired! Pass through 1 wall.");
 }
 
 
@@ -271,30 +321,40 @@ void draw_status_screen() {
     refresh();
 }
 
-void wait_screen() {
+bool wait_screen() {
     timeout(-1);
     while (1) {
         draw_status_screen();
         int key = getch();
-        if (key == '\t') break;
+        if (key == '\t') return true;
+        if (key == 'q') return false;
     }
 }
 
 void place_switch_near_center() {
     int attempts = 1000;
-    int cy = MAZE_HEIGHT / 2;
-    int cx = MAZE_WIDTH / 2;
 
     while (attempts--) {
-        int y = cy + (rand() % 5) - 2;  // 중심 주변
-        int x = cx + (rand() % 5) - 2;
-        if (y > 0 && y < MAZE_HEIGHT - 1 && x > 0 && x < MAZE_WIDTH - 1 && maze[y][x] == ' ') {
-            maze[y][x] = 'S';
-            return;
-        }
+        int y = rand() % MAZE_HEIGHT;
+        int x = rand() % MAZE_WIDTH;
+
+        if (maze[y][x] != ' ')
+            continue;
+
+        int dist_to_start = abs(y - py) + abs(x - px);
+        int dist_to_exit = abs(y - (MAZE_HEIGHT - 2)) + abs(x - (MAZE_WIDTH - 2));
+
+        // 너무 가까운 곳은 제외
+        if (dist_to_start < 8) continue;
+        // 출구와 문 근처도 제외
+        if (dist_to_exit < 6) continue;
+
+        maze[y][x] = 'S';
+        return;
     }
 
-    place_random_item('S'); 
+    // 실패 시 백업
+    place_random_item('S');
 }
 
 void place_door_near_exit() {
@@ -352,8 +412,8 @@ void draw_maze() {
                 case 'B': color = 3; break;
                 case 'S': color = 3; break;  // switch
                 case 'D': color = 3; break;  // door
-                case 'C': color = 3; break;  // collapsing tile
                 case 'M': color = 3; break;
+                case 'T': color = 3; break;
                 case '?': color = 3; break;
             }
             if (color > 0) attron(COLOR_PAIR(color));
@@ -390,11 +450,14 @@ void draw_maze() {
     if (player_has_key)
         mvprintw(ui_y++, ui_x, "| Key        : Yes       |");
     if (player_has_breaker)
-        mvprintw(ui_y++, ui_x, "| Wall Break : Ready     |");
-    if (has_push_item)
-        mvprintw(ui_y++, ui_x, "| Push Box   : Ready     |");
+        mvprintw(ui_y++, ui_x, "| Wall Break : %2d left   |", breaker_count);
     if (ghost_mode)
         mvprintw(ui_y++, ui_x, "| Z Freeze   : Active    |");
+    if (has_push_item)
+        mvprintw(ui_y++, ui_x, "| Wall Phase : Ready     |");
+    if (boss_resisted_z) {
+        mvprintw(ui_y++, ui_x, "| Boss Resist : ACTIVE   |");
+    }
     mvprintw(ui_y++, ui_x, "+------------------------+");
 
     ui_y++;
@@ -408,9 +471,8 @@ void draw_maze() {
     mvprintw(ui_y++, ui_x, "'K' = Key");
     mvprintw(ui_y++, ui_x, "'B' = Wall Breaker");
     mvprintw(ui_y++, ui_x, "'S' = Switch, 'D' = Door");
-    mvprintw(ui_y++, ui_x, "'M' = Push Box (x)");
+    mvprintw(ui_y++, ui_x, "'M' = Wall Phase (1-use)");
     mvprintw(ui_y++, ui_x, "'?' = Mystery");
-    mvprintw(ui_y++, ui_x, "'C' = Collapsing Tile");
     mvprintw(ui_y++, ui_x, "'T' = +10 Time");
     mvprintw(ui_y++, ui_x, "'P' = Portal");
     mvprintw(ui_y++, ui_x, "'X' = Locked Portal");
@@ -420,6 +482,17 @@ void draw_maze() {
     mvprintw(ui_y++, ui_x, "| Z Cooldown : %2ds       |", z_remaining);
     mvprintw(ui_y++, ui_x, "| Z Used     : %d times   |", z_usage_count);
 
+    // 보스 포탈 생존 시간 표시
+    if (level % 5 == 0 && maze[MAZE_HEIGHT - 2][MAZE_WIDTH - 2] != 'P') {
+        int required_survive = get_boss_survive_time(level);
+        int survived = time(NULL) - level_start_time;
+        int remain = required_survive - survived;
+        if (remain < 0) remain = 0;
+
+        mvprintw(ui_y++, ui_x, "| Portal unlocks in : %2ds |", remain);
+    }
+
+    boss_resisted_z = 0;
 }
 
 void generate_maze_with_items() {
@@ -432,16 +505,20 @@ void generate_maze_with_items() {
     has_push_item = false;
 
     // 필수 아이템
-    place_random_item('K');
+    if (level % 5 != 0)
+        place_random_item('K');
     maze[MAZE_HEIGHT - 2][MAZE_WIDTH - 2] = 'X';
 
-    // 해커면 포탈 즉시 열림
-    if (player_style == STYLE_HACKER) {
+    // 해커면 포탈 즉시 열림 (보스 레벨 제외)
+    if (player_style == STYLE_HACKER && level % 5 != 0) {
         maze[MAZE_HEIGHT - 2][MAZE_WIDTH - 2] = 'P';
+    } else {
+        maze[MAZE_HEIGHT - 2][MAZE_WIDTH - 2] = 'X';  // 기본은 잠김
     }
 
+
     // 선택 아이템 후보 목록
-    char pool[] = { 'B', 'S', 'C', 'M', '?', 'T' };
+    char pool[] = { 'B', 'S', 'M', '?', 'T' };
     shuffle_array(pool, 6);
 
     int has_S = 0;
@@ -461,16 +538,30 @@ void generate_maze_with_items() {
         count++;
     }
 
-    // level ≥ 3: 'C' or '?' 반드시 삽입
+    // 주기적으로 아이템 생성 (보스 스테이지 전용)
+    if (level % 5 == 0) {
+        time_t now = time(NULL);
+        if (now - last_boss_item_time >= 10) {  // 10초마다
+            int r = rand() % 3;
+            switch (r) {
+                case 0: place_random_item('?'); break;
+                case 1: place_random_item('T'); break;
+                case 2: place_random_item('M'); break;
+            }
+            last_boss_item_time = now;
+        }
+    }
+
+    // level ≥ 3: '?' 반드시 삽입
     if (level >= 3) {
         int ensured = 0;
         for (int i = 0; i < count; i++) {
-            if (selected_items[i] == 'C' || selected_items[i] == '?') {
+            if (selected_items[i] == '?') {
                 ensured = 1;
                 break;
             }
         }
-        if (!ensured) place_random_item((rand() % 2 == 0) ? 'C' : '?');
+        if (!ensured) place_random_item('?');
     }
 
     // level ≥ 5: S와 D 구조 무조건 추가
@@ -500,7 +591,6 @@ void process_player_move(int key, bool *level_complete_ptr) {
         char next = maze[ny][nx];
         if (next == '#') return;
         if (next == 'D') return;
-        if (next == 'C') { collapse_tile(ny, nx); return; }
         if (next == 'S') activate_switch();
         if (next == 'K') pickup_key(ny, nx);
         if (next == 'B') pickup_breaker(ny, nx);
@@ -509,37 +599,76 @@ void process_player_move(int key, bool *level_complete_ptr) {
             maze[ny][nx] = ' ';
             apply_random_box_effect();
         }
-        if (next == 'P' && (player_has_key || player_style == STYLE_HACKER)) {
-            mvprintw(center_y_offset + MAZE_HEIGHT + 5, center_x_offset + 4,
-                    "You cleared Level %d! Press any key...", level);
-            refresh(); getch();
-
-            // 생명 손실을 반영한 시간 보너스 계산
-            int initial_lifes = 3;
-            int total_time_per_life = 120;
-            int time_used = total_time_per_life * (initial_lifes - lifes) + (total_time_per_life - time_left);
-            int total_possible_time = total_time_per_life * initial_lifes;
-            int time_saved = total_possible_time - time_used;
-            if (time_saved < 0) time_saved = 0;
-
-            int bonus_multiplier = 2 + level / 5;
-            int bonus = time_saved * bonus_multiplier;
-            score += 100 + bonus;  // 기본 점수 + 보너스
-            lifes = 3;
-            level++;
-
-            mvprintw(center_y_offset + MAZE_HEIGHT + 6, center_x_offset + 4,
-                    "Bonus for speed: +%d", bonus);
-            refresh(); getch();
-
-            *level_complete_ptr = true;
-            return;
-        }
         if (next == 'T') {
-            time_left += 10;
+            level_start_time -= 10;
             maze[ny][nx] = ' ';
             mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "You gained +10 seconds!");
         }
+        if (next == '#') {
+            if (has_push_item) {
+                has_push_item = false;
+                mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "You phased through the wall!");
+            } else {
+                return;
+            }
+        }
+        if (next == 'P') {
+            int required_survive = get_boss_survive_time(level);
+
+            // 보스 스테이지에서는 생존 시간이 충족되어야 포탈이 열린다
+            if (level % 5 == 0) {
+                int survived = time(NULL) - level_start_time;
+
+                if (maze[MAZE_HEIGHT - 2][MAZE_WIDTH - 2] != 'P') {
+                    if (survived < required_survive) {
+                        mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4,
+                                "Portal is locked! Survive %ds (Remaining: %ds)",
+                                required_survive, required_survive - survived);
+                        return;
+                    } else {
+                        maze[MAZE_HEIGHT - 2][MAZE_WIDTH - 2] = 'P';  // 생존 완료 시 포탈 열기
+                    }
+                }
+            }
+
+            // 통과 조건 만족 → 클리어 처리
+            if (player_has_key || player_style == STYLE_HACKER || maze[MAZE_HEIGHT - 2][MAZE_WIDTH - 2] == 'P') {
+                mvprintw(center_y_offset + MAZE_HEIGHT + 5, center_x_offset + 4,
+                        "You cleared Level %d! Press any key...", level);
+                refresh(); getch();
+
+                // 생명 손실을 반영한 시간 보너스 계산
+                int initial_lifes = 3;
+                int total_time_per_life = 120;
+                int time_used = total_time_per_life * (initial_lifes - lifes) + (total_time_per_life - time_left);
+                int total_possible_time = total_time_per_life * initial_lifes;
+                int time_saved = total_possible_time - time_used;
+                if (time_saved < 0) time_saved = 0;
+
+                int bonus_multiplier = 2 + level / 5;
+                int bonus = time_saved * bonus_multiplier;
+                score += 100 + bonus;  // 기본 점수 + 보너스
+                lifes = 3;
+                level++;
+
+                if (level == 15) {
+                    show_ending_credits();
+                    destroy_enemies();
+                    g_return_to_menu = true;
+                    *level_complete_ptr = true;
+                    return;
+                }
+
+                mvprintw(center_y_offset + MAZE_HEIGHT + 6, center_x_offset + 4,
+                        "Bonus for speed: +%d", bonus);
+                refresh(); getch();
+
+                *level_complete_ptr = true;
+                return;
+            }
+        }
+
+
         px = nx;
         py = ny;
     }
@@ -548,6 +677,8 @@ void process_player_move(int key, bool *level_complete_ptr) {
 void start_maze_game() {
     choose_player_style(); 
     apply_player_style_effects();
+    breaker_count = (player_style == STYLE_BREAKER) ? MAX_BREAKER : 1;
+    player_has_breaker = true;
     if (player_speed_is) {
         player_speed = 1;
         player_speed += 9;
@@ -567,6 +698,11 @@ void start_maze_game() {
         srand(time(NULL) + level);
         generate_maze_with_items();
         level_start_time = time(NULL);
+        last_boss_item_time = time(NULL);
+
+        if (level % 5 == 0) {
+            has_push_item = true;  // ✅ 벽 통과 아이템 1회 지급
+        }
         int time_var = 120 - (level - 1) * 5;
             if (time_var < 60) time_var = 60;
         time_left = time_var;
@@ -596,32 +732,48 @@ void start_maze_game() {
                 key = getch();
                 if (key != ERR) {
                     process_player_move(key, &level_complete);
+                    if (g_return_to_menu) return;
                     break;
                 }
                 usleep(30000 / player_speed);
             }
 
-            // 🎯 키 입력 처리
-            if (key == '\t') { wait_screen(); continue; }
-            if (key == 'q') return;
+            if (key == '\t') {
+                if (!wait_screen()) return;
+                continue;
+            }
 
             // 벽 부수기
             if (key == 'w' && player_has_breaker) {
                 int dx[4] = {0, 0, -1, 1}, dy[4] = {-1, 1, 0, 0};
+
                 for (int d = 0; d < 4; d++) {
                     int ax = px + dx[d], ay = py + dy[d];
                     if (ay >= 0 && ay < MAZE_HEIGHT && ax >= 0 && ax < MAZE_WIDTH && maze[ay][ax] == '#')
                         maze[ay][ax] = ' ';
                 }
-                player_has_breaker = false;
+
+                breaker_count--;
+
+                if (breaker_count <= 0) {
+                    player_has_breaker = false;
+                    breaker_count = 0;
+                }
+
                 continue;
             }
+
+
 
             // Freeze (Z)
             if (key == 'z' && time(NULL) - last_z_use >= Z_COOLDOWN) {
                 int tx = px + last_dir_x, ty = py + last_dir_y;
                 for (int i = 0; i < MAX_ENEMIES; i++) {
                     if (enemies[i].alive && enemies[i].x == tx && enemies[i].y == ty) {
+                        if (enemies[i].type == TYPE_BOSS) {
+                            boss_resisted_z = 1;
+                            break;
+                        }
                         enemies[i].type = TYPE_FROZEN;
                         ghost_mode = true;
                         last_z_use = time(NULL);
@@ -631,15 +783,19 @@ void start_maze_game() {
                 }
             }
 
-            // Push (X)
-            if ((key == 'z' || key == 'x') && has_push_item) {
-                int tx = px + last_dir_x, ty = py + last_dir_y;
-                int tx2 = px + last_dir_x * 2, ty2 = py + last_dir_y * 2;
+            // 벽 통과 (Wall Phase)
+            if (key == 'x' && has_push_item) {
+                int tx = px + last_dir_x;
+                int ty = py + last_dir_y;
+                int tx2 = px + last_dir_x * 2;
+                int ty2 = py + last_dir_y * 2;
+
                 if (maze[ty][tx] == '#' && maze[ty2][tx2] == ' ') {
-                    maze[ty2][tx2] = '#';
-                    maze[ty][tx] = ' ';
+                    px = tx2;
+                    py = ty2;
                     has_push_item = false;
-                    mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Pushed wall forward!");
+                    mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "You phased through the wall!");
+                    continue;
                 }
             }
 

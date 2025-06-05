@@ -6,6 +6,7 @@
 #include <pwd.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <time.h>
 #include "game.h"
 
@@ -21,6 +22,63 @@ typedef struct {
     short score;
     short lifes;
 } SaveData;
+
+int get_saved_level(const char* save_name) {
+    char path[512];
+    snprintf(path, sizeof(path), "assets/save/%s.txt", save_name);
+    FILE* fp = fopen(path, "r");
+    if (!fp) return 0;
+
+    char username[64];
+    int level;
+    if (fscanf(fp, "%s %d", username, &level) == 2) {
+        fclose(fp);
+        return level;
+    }
+
+    fclose(fp);
+    return 0;
+}
+
+int get_saved_score(const char* save_name) {
+    char path[512];
+    snprintf(path, sizeof(path), "assets/save/%s.txt", save_name);
+    FILE* fp = fopen(path, "r");
+    if (!fp) return 0;
+
+    char username[64];
+    int level, score;
+    if (fscanf(fp, "%s %d %d", username, &level, &score) == 3) {
+        fclose(fp);
+        return score;
+    }
+
+    fclose(fp);
+    return 0;
+}
+
+const char* get_save_progress(const char* save_name) {
+    static char buffer[64];
+    int level = get_saved_level(save_name);
+    int score = get_saved_score(save_name);
+    snprintf(buffer, sizeof(buffer), "%d | %d", level, score);
+    return buffer;
+}
+
+void clear_all_save_files(void) {
+    DIR* dir = opendir("assets/save");
+    if (!dir) return;
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strstr(entry->d_name, ".txt")) {
+            char path[512];
+            snprintf(path, sizeof(path), "assets/save/%s", entry->d_name);
+            remove(path);
+        }
+    }
+    closedir(dir);
+}
 
 bool save_game(const char* filename) {
     struct stat st = {0};

@@ -3,6 +3,7 @@
 
 #define COLOR_HUD 1
 #define SAVE_DIR "assets/save"
+#include <stdbool.h>
 
 // 전역 변수
 extern int g_width;
@@ -17,16 +18,14 @@ extern int player_has_key;
 extern int player_has_breaker;
 extern int player_speed;
 
+extern bool g_return_to_menu;
+
 #define MAZE_WIDTH 45
 #define MAZE_HEIGHT 29
 
-void start_maze_game(void);
-void choose_player_style(void);
-void apply_style_effects(void);
-void handle_player_input(void);
-void update_game_state(void);
-void draw_maze(void);
-void draw_status_bar(void);
+void start_maze_game();
+void generate_maze(int y, int x);
+void draw_maze();
 
 extern char maze[MAZE_HEIGHT][MAZE_WIDTH];
 extern int player_has_key;

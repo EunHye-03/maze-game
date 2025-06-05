@@ -10,6 +10,7 @@ typedef enum {
     ENEMY_RANDOM,       // 무작위 이동
     ENEMY_COWARD,       // 일정 거리 이내면 도망
     TYPE_FROZEN,        // 적 멈추기
+    TYPE_BOSS,          // 보스
 } EnemyType;
 
 // 적 구조체 정의
@@ -32,8 +33,5 @@ void init_enemies();
 void destroy_enemies();
 void *enemy_thread(void *arg);
 int ask_retry();
-
-// 보스
-#define TYPE_BOSS 99
 
 #endif

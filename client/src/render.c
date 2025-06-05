@@ -5,9 +5,14 @@
 #include <string.h>
 #include <unistd.h> 
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
+#define true 1
+#define false 0
+
 char g_old_username[32] = {0};
+bool g_show_congrats = false;
 
 const char *menu_logo[] = {
     " # #       # #           #          # # # # # #   # # # # #",
@@ -169,14 +174,15 @@ void draw_logo() {
     attroff(COLOR_PAIR(2));
 }
 
-void input_save_name_screen(char* output_name) {
+// return 1: 정상 저장, 0: 취소
+int input_save_name_screen(char* output_name) {
     timeout(-1);
     echo();
     curs_set(1);
 
     erase();
     getmaxyx(stdscr, g_height, g_width);
-    mvprintw(g_height / 2 - 2, g_width / 2 - 20, "Enter save name (max 31 chars):");
+    mvprintw(g_height / 2 - 2, g_width / 2 - 20, "Enter save name (ESC to cancel):");
     mvprintw(g_height / 2, g_width / 2 - 10, "> ");
     refresh();
 
@@ -186,6 +192,10 @@ void input_save_name_screen(char* output_name) {
 
     int ch;
     while ((ch = getch()) != '\n') {
+        if (ch == 27) {  // ESC
+            noecho(); curs_set(0); timeout(0);
+            return 0;
+        }
         if (isalnum(ch) && idx < 31) {
             output_name[idx++] = ch;
             mvaddch(g_height / 2, x++, ch);
@@ -200,9 +210,8 @@ void input_save_name_screen(char* output_name) {
     }
 
     output_name[idx] = '\0';
-    noecho();
-    curs_set(0);
-    timeout(0);
+    noecho(); curs_set(0); timeout(0);
+    return 1;
 }
 
 
@@ -270,6 +279,13 @@ void draw_menu(int selected) {
         mvprintw(start_y + i * spacing, g_width / 2 - strlen(buf) / 2, "%s", buf);
         attroff(COLOR_PAIR(2));
         attroff(A_BOLD);
+    }
+
+    if (g_show_congrats) {
+        const char *congrats_msg = "You cleared final level! Congratulations!";
+        attron(COLOR_PAIR(3));
+        mvprintw(2, g_width / 2 - strlen(congrats_msg) / 2, "%s", congrats_msg);
+        attroff(COLOR_PAIR(3));
     }
 
     char welcome_buf[64];

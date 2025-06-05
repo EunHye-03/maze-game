@@ -38,7 +38,7 @@ void *enemy_thread(void *arg) {
                 }
                 break;
 
-            case ENEMY_RANDOM: {
+            case ENEMY_RANDOM:
                 int dirs[4][2] = {{0,1},{0,-1},{1,0},{-1,0}};
                 int r = rand() % 4;
                 int nx = e->x + dirs[r][1], ny = e->y + dirs[r][0];
@@ -53,7 +53,11 @@ void *enemy_thread(void *arg) {
                 free(path);
                 path = NULL;
                 continue;
-            }
+
+            case TYPE_BOSS:
+                astar_find_path(e->y, e->x, py, px, path, &pathLen);  // ✅ 보스도 A* 추적
+                break;
+            
             case TYPE_FROZEN:
                 usleep(100000); // 정지 상태로 짧게 슬립
                 continue; // 아무 것도 안 하고 반복
@@ -79,26 +83,35 @@ void *enemy_thread(void *arg) {
 
 void init_enemies() {
     destroy_enemies();
+    usleep(100000);
+
     srand(time(NULL)); // 랜덤 초기화
 
-    // ✅ 먼저 보스 레벨인지 확인
+    // 먼저 보스 레벨인지 확인
     if (level % 5 == 0) {
         for (int i = 0; i < MAX_ENEMIES; i++) {
             enemies[i].alive = 0;
             enemies[i].thread = 0;
         }
 
-        enemies[0].x = MAZE_WIDTH - 3;
-        enemies[0].y = MAZE_HEIGHT - 3;
+        // 보스 생성 부분 수정
+        int tries = 0;
+        do {
+            enemies[0].x = rand() % MAZE_WIDTH;
+            enemies[0].y = rand() % MAZE_HEIGHT;
+            tries++;
+        } while ((maze[enemies[0].y][enemies[0].x] != ' ') && tries < 100);
+
         enemies[0].type = TYPE_BOSS;
         enemies[0].alive = 1;
         enemies[0].hp = 3;
         pthread_create(&enemies[0].thread, NULL, enemy_thread, &enemies[0]);
-        return; // ✅ 일반 적 생성은 스킵
+
+        return; // 일반 적 생성은 스킵
     }
 
-    // ✅ 일반 적 생성
-    int num_enemies = 1 + (level - 1); // 레벨에 따라 적 수 증가
+    // 일반 적 생성
+    int num_enemies = (level < 5) ? 2 : (level < 10) ? 3 : 4;
     if (num_enemies > MAX_ENEMIES) num_enemies = MAX_ENEMIES;
 
     for (int i = 0; i < num_enemies; i++) {
