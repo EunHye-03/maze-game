@@ -347,6 +347,7 @@ int get_color_for_char(char ch) {
         case 'P': return 5; break;  // Portal
         case 'B': return 3; break;  // Break wall
         case 'S': return 3; break;  // switch
+        case 'T': return 3; break;  // Time
         case 'D': return 3; break;  // door
         case 'C': return 3; break;  // collapsing tile
         case 'M': return 3; break;  // Push box
@@ -399,9 +400,9 @@ void draw_maze() {
         mvprintw(ui_y++, ui_x, "| Push Box   : Ready     |");
     if (ghost_mode)
         mvprintw(ui_y++, ui_x, "| Z Freeze   : Active    |");
-    mvprintw(ui_y++, ui_x, "+------------------------+");
+    if (player_has_key || player_has_breaker || has_push_item || ghost_mode)
+        mvprintw(ui_y++, ui_x, "+------------------------+");
 
-    ui_y++;
     mvprintw(ui_y++, ui_x, "[Controls]");
     mvprintw(ui_y++, ui_x, "Arrow Keys - Move");
     mvprintw(ui_y++, ui_x, "W - Wall Break");
@@ -462,7 +463,13 @@ void draw_maze() {
     printw("' = Collapsing Tile");
     ui_y++;
 
-    mvprintw(ui_y++, ui_x, "'T' = +10 Time");
+   // 'T' = Time
+    mvprintw(ui_y, ui_x, "'");
+    attron(COLOR_PAIR(get_color_for_char('T')));
+    printw("T");
+    attroff(COLOR_PAIR(get_color_for_char('T')));
+    printw("' = +10 Time");
+    ui_y++;
 
     // 'P' = Portal
     mvprintw(ui_y, ui_x, "'");
@@ -485,6 +492,9 @@ void draw_maze() {
     mvprintw(ui_y++, ui_x, "+------------------------+");
     mvprintw(ui_y++, ui_x, "| Z Cooldown : %2ds       |", z_remaining);
     mvprintw(ui_y++, ui_x, "| Z Used     : %d times   |", z_usage_count);
+    mvprintw(ui_y++, ui_x, "+------------------------+");
+    mvprintw(ui_y++, ui_x, "[Tab] Go to Standby");
+    mvprintw(ui_y++, ui_x, "[Q] Back to Title");
 
 }
 
@@ -578,7 +588,7 @@ void process_player_move(int key, bool *level_complete_ptr) {
         if (next == 'P' && (player_has_key || player_style == STYLE_HACKER)) {
             mvprintw(center_y_offset + MAZE_HEIGHT + 5, center_x_offset + 4,
                     "You cleared Level %d! Press any key...", level);
-            refresh(); getch();
+            refresh(); sleep(2); getch();
 
             // 생명 손실을 반영한 시간 보너스 계산
             int initial_lifes = 3;
@@ -596,7 +606,7 @@ void process_player_move(int key, bool *level_complete_ptr) {
 
             mvprintw(center_y_offset + MAZE_HEIGHT + 6, center_x_offset + 4,
                     "Bonus for speed: +%d", bonus);
-            refresh(); getch();
+            refresh(); sleep(2); getch();
 
             *level_complete_ptr = true;
             return;
