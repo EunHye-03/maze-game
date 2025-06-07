@@ -13,5 +13,6 @@ int get_saved_level(const char* name);
 int get_saved_score(const char* name);
 const char* get_save_progress(const char* name);
 void clear_all_save_files();;
+const char* get_saved_username(const char* save_name);
 
 #endif // SAVE_H

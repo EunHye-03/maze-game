@@ -72,6 +72,7 @@ int main() {
                         switch (info_item) {
                             case 0:
                                 select_save_file_menu();
+                                break;
                             case 1: // Save Game
                                 handle_save_game();
                                 break;

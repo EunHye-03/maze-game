@@ -15,7 +15,6 @@ extern short lifes;
 
 extern int px, py;
 extern int player_has_key;
-extern int player_has_breaker;
 extern int player_speed;
 
 extern bool g_return_to_menu;
@@ -53,7 +52,6 @@ typedef enum {
     STYLE_SPEEDSTER,   // 속도 +1
     STYLE_TANK,        // 생명 +1
     STYLE_HACKER,      // 열쇠 없이 포탈 가능
-    STYLE_BREAKER,     // 시작 시 벽 부수기 아이템 보유
     STYLE_TRICKSTER,   // 미스터리 박스 효과 향상
     STYLE_COUNT
 } PlayerStyle;

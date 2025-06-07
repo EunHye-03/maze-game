@@ -28,7 +28,6 @@ short score = 0;
 short lifes = 3;
 
 int player_has_key = false;
-int player_has_breaker = false;
 int player_speed_is = false;
 int player_speed = 1;
 
@@ -46,9 +45,6 @@ char selected_items[2];  // 선택된 무작위 아이템 2개
 int has_push_item = false;  // M 아이템 획득 여부
 
 PlayerStyle player_style;
-
-#define MAX_BREAKER 5
-int breaker_count = 0;
 
 int boss_resisted_z = 0;
 time_t last_boss_item_time = 0;
@@ -107,7 +103,6 @@ const char* style_names[] = {
     "Speedster (+10 speed)",
     "Tank (+1 life)",
     "Hacker (Portal without key)",
-    "Breaker (Start with wall breaker)",
     "Trickster (Better mystery effects)"
 };
 
@@ -132,21 +127,17 @@ void apply_player_style_effects() {
             lifes += 1;
             break;
         case STYLE_HACKER:
-            // 포탈에 키 없어도 통과 → 별도 조건에서 처리 필요
-            break;
-        case STYLE_BREAKER:
-            player_has_breaker = true;
-            breaker_count = MAX_BREAKER; 
+            // 포탈에 키 없어도 통과 -> 별도 조건에서 처리 필요
             break;
         case STYLE_TRICKSTER:
-            // Mystery 효과 강화 → random_box_effect 내부에서 분기 필요
+            // Mystery 효과 강화 -> random_box_effect 내부에서 분기 필요
             break;
         default:
             break;
     }
 }
 
-void choose_player_style() {
+bool choose_player_style() {
     int choice = 0;
     timeout(-1);  // 키 입력 대기
 
@@ -174,9 +165,14 @@ void choose_player_style() {
             choice = (choice + 1) % STYLE_COUNT;
         else if (key == '\n')
             break;
+        else if (key == 'q' || key == 27) {
+            return false;
+            break;
+        }
     }
 
     player_style = (PlayerStyle)choice;
+    return true;
 }
 
 
@@ -203,47 +199,43 @@ void shuffle_array(char *array, int size) {
 void apply_random_box_effect() {
     int roll;
     if (player_style == STYLE_TRICKSTER) {
-        roll = rand() % 10;  // 트릭스터는 10종으로 다양하게
+        roll = rand() % 9;  // 트릭스터는 9종으로 다양하게
     } else {
-        roll = rand() % 6;  // 일반 플레이어는 6종
+        roll = rand() % 5;  // 일반 플레이어는 5종
     }
 
     attron(COLOR_PAIR(6));
     switch (roll) {
         case 0:
-            player_has_breaker = true;
-            mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Mystery Box: Wall breaker acquired!");
-            break;
-        case 1:
             has_push_item = true;
             mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Mystery Box: Push item gained! Press 'z'");
             break;
-        case 2:
+        case 1:
             lifes++;
             mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Mystery Box: Lucky! +1 life!");
             break;
-        case 3:
+        case 2:
             spawn_enemy_at(px + 1, py);
             mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Mystery Box: Enemy spawned nearby!");
             break;
-        case 4:
+        case 3:
             player_has_key = false;
             mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Mystery Box: You dropped your key!");
             break;
-        case 5:
+        case 4:
             player_speed = (player_speed > 1) ? player_speed - 1 : 1;
             mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Mystery Box: You feel sluggish... Speed down!");
             break;
-        case 6:
+        case 5:
             px = 1; py = 1;
             mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Mystery Box: Teleported to start!");
             break;
-        case 7:
+        case 6:
             lifes--;
             if (lifes < 0) lifes = 0;
             mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Mystery Box: Ouch! You got hurt! -1 life");
             break;
-        case 8:
+        case 7:
             for (int y = 0; y < MAZE_HEIGHT; y++) {
                 for (int x = 0; x < MAZE_WIDTH; x++) {
                     if (maze[y][x] == ' ' && rand() % 20 == 0)
@@ -252,7 +244,7 @@ void apply_random_box_effect() {
             }
             mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Mystery Box: Walls suddenly grew!");
             break;
-        case 9:
+        case 8:
             score = (score >= 50) ? score - 50 : 0;
             mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Mystery Box: You lost 50 points!");
             break;
@@ -269,7 +261,6 @@ void pickup_key(int y, int x) {
 }
 
 void pickup_breaker(int y, int x) {
-    player_has_breaker = true;
     maze[y][x] = ' ';
     mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Wall breaker acquired! Press 'w'");
 }
@@ -305,7 +296,6 @@ void draw_status_screen() {
     char info1[512], info2[512], info3[512],  info4[512], info5[512];
     snprintf(info1, sizeof(info1), "Speed: %d", player_speed);
     snprintf(info2, sizeof(info2), "Key: %s", player_has_key ? "Yes" : "No");
-    snprintf(info3, sizeof(info3), "Wall Breaker: %s", player_has_breaker ? "Yes" : "No");
     snprintf(info4, sizeof(info4), "Random Items: %c, %c (Key is always included)", selected_items[0], selected_items[1]);
     snprintf(info5, sizeof(info5), "Your Style: %s", style_names[player_style]);
 
@@ -449,8 +439,6 @@ void draw_maze() {
     mvprintw(ui_y++, ui_x, "+------------------------+");
     if (player_has_key)
         mvprintw(ui_y++, ui_x, "| Key        : Yes       |");
-    if (player_has_breaker)
-        mvprintw(ui_y++, ui_x, "| Wall Break : %2d left   |", breaker_count);
     if (ghost_mode)
         mvprintw(ui_y++, ui_x, "| Z Freeze   : Active    |");
     if (has_push_item)
@@ -501,7 +489,6 @@ void generate_maze_with_items() {
 
     px = 1; py = 1;
     player_has_key = false;
-    player_has_breaker = false;
     has_push_item = false;
 
     // 필수 아이템
@@ -552,7 +539,7 @@ void generate_maze_with_items() {
         }
     }
 
-    // level ≥ 3: '?' 반드시 삽입
+    // level >= 3: '?' 반드시 삽입
     if (level >= 3) {
         int ensured = 0;
         for (int i = 0; i < count; i++) {
@@ -564,7 +551,7 @@ void generate_maze_with_items() {
         if (!ensured) place_random_item('?');
     }
 
-    // level ≥ 5: S와 D 구조 무조건 추가
+    // level >= 5: S와 D 구조 무조건 추가
     if (level >= 5 && !has_S) {
         place_switch_near_center();
         has_S = 1;
@@ -573,7 +560,7 @@ void generate_maze_with_items() {
         place_door_near_exit();
     }
 
-    // level ≥ 7: 'T' (+10초) 아이템 랜덤 삽입
+    // level >= 7: 'T' (+10초) 아이템 랜덤 삽입
     if (level >= 7 && rand() % 2 == 0) {
         place_random_item('T');
     }
@@ -631,7 +618,7 @@ void process_player_move(int key, bool *level_complete_ptr) {
                 }
             }
 
-            // 통과 조건 만족 → 클리어 처리
+            // 통과 조건 만족 -> 클리어 처리
             if (player_has_key || player_style == STYLE_HACKER || maze[MAZE_HEIGHT - 2][MAZE_WIDTH - 2] == 'P') {
                 mvprintw(center_y_offset + MAZE_HEIGHT + 5, center_x_offset + 4,
                         "You cleared Level %d! Press any key...", level);
@@ -675,10 +662,9 @@ void process_player_move(int key, bool *level_complete_ptr) {
 }
 
 void start_maze_game() {
-    choose_player_style(); 
+    if (!choose_player_style())
+        return; 
     apply_player_style_effects();
-    breaker_count = (player_style == STYLE_BREAKER) ? MAX_BREAKER : 1;
-    player_has_breaker = true;
     if (player_speed_is) {
         player_speed = 1;
         player_speed += 9;
@@ -701,7 +687,7 @@ void start_maze_game() {
         last_boss_item_time = time(NULL);
 
         if (level % 5 == 0) {
-            has_push_item = true;  // ✅ 벽 통과 아이템 1회 지급
+            has_push_item = true;  // 벽 통과 아이템 1회 지급
         }
         int time_var = 120 - (level - 1) * 5;
             if (time_var < 60) time_var = 60;
@@ -730,6 +716,7 @@ void start_maze_game() {
             int key;
             for (int speed_step = 0; speed_step < player_speed; speed_step++) {
                 key = getch();
+
                 if (key != ERR) {
                     process_player_move(key, &level_complete);
                     if (g_return_to_menu) return;
@@ -742,28 +729,6 @@ void start_maze_game() {
                 if (!wait_screen()) return;
                 continue;
             }
-
-            // 벽 부수기
-            if (key == 'w' && player_has_breaker) {
-                int dx[4] = {0, 0, -1, 1}, dy[4] = {-1, 1, 0, 0};
-
-                for (int d = 0; d < 4; d++) {
-                    int ax = px + dx[d], ay = py + dy[d];
-                    if (ay >= 0 && ay < MAZE_HEIGHT && ax >= 0 && ax < MAZE_WIDTH && maze[ay][ax] == '#')
-                        maze[ay][ax] = ' ';
-                }
-
-                breaker_count--;
-
-                if (breaker_count <= 0) {
-                    player_has_breaker = false;
-                    breaker_count = 0;
-                }
-
-                continue;
-            }
-
-
 
             // Freeze (Z)
             if (key == 'z' && time(NULL) - last_z_use >= Z_COOLDOWN) {

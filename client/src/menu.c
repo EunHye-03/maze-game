@@ -5,6 +5,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <dirent.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
 #include "menu.h"
 #include "game.h"
@@ -42,6 +45,7 @@ void select_save_file_menu() {
 
         for (int i = 0; i < save_count; i++) {
             int y = g_height / 2 - save_count / 2 + i;
+
             char name[256];
             strncpy(name, save_files[i], sizeof(name) - 1);
             name[sizeof(name) - 1] = '\0';
@@ -49,19 +53,21 @@ void select_save_file_menu() {
             char *dot = strstr(name, ".txt");
             if (dot) *dot = '\0';
 
+            const char* username = get_saved_username(name);
             const char* progress = get_save_progress(name);
-            int name_x = g_width / 2 - 20;
-            int progress_x = g_width / 2 + 10;
+
+            char line[512];
+            snprintf(line, sizeof(line), "%-12s  %-10s  %-5s", name, username, progress);
+
+            int x = (g_width - strlen(line)) / 2;
 
             if (i == choice && state == MENU_SELECTING) {
-                attron(A_REVERSE);
-                mvprintw(y, name_x, "> %s <", name);
-                attroff(A_REVERSE);
+                mvprintw(y, x - 2, "> %s <", line);
             } else {
-                mvprintw(y, name_x + 2, "%s", name);
+                mvprintw(y, x, "%s", line);
             }
-            mvprintw(y, progress_x, "Progress: %s", progress);
         }
+
 
         const char *back_label = (choice == save_count && state == MENU_SELECTING) ? "> Back <" : "  Back  ";
         int back_y = g_height / 2 + save_count / 2 + 2;
@@ -102,9 +108,7 @@ void select_save_file_menu() {
                     if (choice == save_count) {
                         return;
                     } else {
-                        if (load_specific_game(save_files[choice])) {
-                            intro_animation();
-                        }
+                        load_specific_game(save_files[choice]);
                         state = MENU_DONE;
                     }
                 } else if (key == 27 || key == KEY_BACKSPACE || key == 127) {
@@ -144,19 +148,41 @@ void handle_save_game(void) {
     if (strlen(savename) == 0)
         strcpy(savename, "default_save");
 
+    struct stat st;
+    if (stat("assets", &st) == -1) {
+        if (mkdir("assets", 0700) == -1) {
+            mvprintw(g_height / 2, (g_width - 30) / 2, "Failed to create assets dir");
+            refresh(); napms(1000);
+            return;
+        }
+    }
+    if (stat("assets/save", &st) == -1) {
+        if (mkdir("assets/save", 0700) == -1) {
+            mvprintw(g_height / 2, (g_width - 36) / 2, "Failed to create assets/save dir");
+            refresh(); napms(1000);
+            return;
+        }
+    }
+
     char check_path[256];
     snprintf(check_path, sizeof(check_path), "assets/save/%s.txt", savename);
-    FILE *check = fopen(check_path, "r");
-    if (check) {
-        fclose(check);
+
+    int fd = open(check_path, O_RDONLY);
+    if (fd != -1) {
+        close(fd);
         mvprintw(g_height / 2 + 2, (g_width - 40) / 2, "Overwrite existing save? (y/n)");
         refresh();
         int ch = getch();
         if (ch != 'y' && ch != 'Y') return;
     }
 
-    save_game(check_path);
+    if (!save_game(check_path)) {
+        mvprintw(g_height / 2 + 4, (g_width - 30) / 2, "Failed to save the game.");
+        refresh();
+        napms(1000);
+    }
 }
+
 
 void handle_intro(void) {
     input_username_screen();

@@ -66,60 +66,66 @@ void check_terminal_size() {
 
 void input_username_screen() {
     timeout(-1);
-    echo();
-    curs_set(1);
+    noecho();          // 자동 출력 금지
+    curs_set(1);       // 커서 보이기
 
-    // 기존 이름 백업
     strncpy(g_old_username, g_username, sizeof(g_old_username) - 1);
+    g_old_username[sizeof(g_old_username) - 1] = '\0';
 
     char input[32] = {0};
     int idx = 0;
 
     erase();
     getmaxyx(stdscr, g_height, g_width);
-    mvprintw(g_height / 2 - 2, g_width / 2 - 20, "Enter your name (ENG only, max 31 chars):");
-    mvprintw(g_height / 2, g_width / 2 - 10, "> ");
+
+    const char *msg = "Enter your name (ENG only, max 31 chars):";
+    int base_y = g_height / 2;
+    int prompt_x = g_width / 2 - 20;
+
+    mvprintw(base_y - 2, g_width / 2 - strlen(msg) / 2, "%s", msg);
+    mvprintw(base_y, prompt_x, "> ");
     refresh();
 
-    int x = g_width / 2 - 8;
-    move(g_height / 2, x);
+    int input_start_x = prompt_x + 2;
+    move(base_y, input_start_x);
 
     int ch;
     while ((ch = getch()) != '\n') {
-        if (isalpha(ch) && idx < 31) {
-            input[idx++] = ch;
-            mvaddch(g_height / 2, x++, ch);
-        } else if ((ch == KEY_BACKSPACE || ch == 127 || ch == '\b') && idx > 0) {
+        if (isascii(ch) && isalpha(ch) && idx < (int)(sizeof(input) - 1)) {
+            input[idx] = ch;
+            mvaddch(base_y, input_start_x + idx, ch);
+            idx++;
+        }
+        else if ((ch == KEY_BACKSPACE || ch == 127 || ch == '\b' || ch == 8) && idx > 0) {
             idx--;
-            x--;
             input[idx] = '\0';
-            mvaddch(g_height / 2, x, ' ');
-            move(g_height / 2, x);
+            mvaddch(base_y, input_start_x + idx, ' ');
+            move(base_y, input_start_x + idx);
         }
         refresh();
     }
 
+    // 이름 설정
     if (idx == 0) {
         strncpy(g_username, "Guest", sizeof(g_username) - 1);
     } else {
         strncpy(g_username, input, sizeof(g_username) - 1);
     }
-
     g_username[sizeof(g_username) - 1] = '\0';
 
-    // 이전 이름의 파일 삭제
+    // 이전 이름 저장파일 제거
     if (strlen(g_old_username) > 0 && strcmp(g_old_username, g_username) != 0) {
         char old_path[256];
         snprintf(old_path, sizeof(old_path), "assets/save/%s.txt", g_old_username);
-        remove(old_path);  // 삭제 시도 (실패해도 무방)
+        remove(old_path);
     }
 
-    char savefile[64];
-    snprintf(savefile, sizeof(savefile), "%s.txt", g_username);
+    // 새로 저장
+    char savefile[256];
+    snprintf(savefile, sizeof(savefile), "assets/save/%s.txt", g_username);
     save_game(savefile);
 
-    noecho();
-    curs_set(0);
+    curs_set(0);  // 커서 숨김
     timeout(0);
 }
 
@@ -214,7 +220,6 @@ int input_save_name_screen(char* output_name) {
     return 1;
 }
 
-
 void draw_game_info_menu(int selected) {
     const char *items[] = {
         "Load Game",
@@ -228,18 +233,24 @@ void draw_game_info_menu(int selected) {
     int start_y = g_height / 2 - count;
 
     for (int i = 0; i < count; ++i) {
-        char temp[64], buf[80];
+        char temp[64];  // 대문자 변환용
+        char buf[80];   // 출력용 전체 문자열
+
         if (i == selected) {
-            for (int j = 0; j < (int)strlen(items[i]) && j < (int)(sizeof(temp) - 1); ++j)
+            int len = strlen(items[i]);
+            for (int j = 0; j < len && j < (int)(sizeof(temp) - 1); ++j)
                 temp[j] = toupper(items[i][j]);
-            temp[strlen(items[i])] = '\0';
+            temp[len] = '\0';
             snprintf(buf, sizeof(buf), "> %s <", temp);
         } else {
             snprintf(buf, sizeof(buf), "%s", items[i]);
         }
 
+        int x = g_width / 2 - strlen(buf) / 2;
+        int y = start_y + i * spacing;
+
         if (i == selected) attron(A_REVERSE);
-        mvprintw(start_y + i * spacing, g_width / 2 - strlen(buf) / 2, "%s", buf);
+        mvprintw(y, x, "%s", buf);
         if (i == selected) attroff(A_REVERSE);
     }
 
