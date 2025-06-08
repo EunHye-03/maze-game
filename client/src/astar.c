@@ -54,7 +54,7 @@ int astar_find_path(int startY, int startX, int goalY, int goalX, int path[][2],
             int cx = current.x, cy = current.y, clen = 0;
 
             while (current.parentX != -1 && current.parentY != -1) {
-                if (clen >= 100) break;  // ✅ path 범위 초과 방지
+                if (clen >= 100) break;  // path 범위 초과 방지
 
                 path[clen][0] = cy;
                 path[clen][1] = cx;
@@ -68,13 +68,13 @@ int astar_find_path(int startY, int startX, int goalY, int goalX, int path[][2],
                 } else break;
             }
 
-            if (clen < 100) {  // ✅ 마지막 시작 지점 넣기
+            if (clen < 100) {  // 마지막 시작 지점 넣기
                 path[clen][0] = startY;
                 path[clen][1] = startX;
                 clen++;
             }
 
-            // ✅ 경로 역순 정렬 (clen 안에서만)
+            // 경로 역순 정렬 (clen 안에서만)
             for (int i = 0; i < clen / 2; i++) {
                 int tmpy = path[i][0], tmpx = path[i][1];
                 path[i][0] = path[clen - 1 - i][0];

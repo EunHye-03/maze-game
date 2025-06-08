@@ -55,7 +55,7 @@ void *enemy_thread(void *arg) {
                 continue;
 
             case TYPE_BOSS:
-                astar_find_path(e->y, e->x, py, px, path, &pathLen);  // ✅ 보스도 A* 추적
+                astar_find_path(e->y, e->x, py, px, path, &pathLen);  // 보스도 A* 추적
                 break;
             
             case TYPE_FROZEN:

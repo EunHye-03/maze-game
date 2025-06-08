@@ -260,11 +260,6 @@ void pickup_key(int y, int x) {
     mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "You picked up the key!");
 }
 
-void pickup_breaker(int y, int x) {
-    maze[y][x] = ' ';
-    mvprintw(center_y_offset + MAZE_HEIGHT + 4, center_x_offset + 4, "Wall breaker acquired! Press 'w'");
-}
-
 void activate_switch() {
     for (int y = 0; y < MAZE_HEIGHT; y++) {
         for (int x = 0; x < MAZE_WIDTH; x++) {
@@ -451,7 +446,6 @@ void draw_maze() {
     ui_y++;
     mvprintw(ui_y++, ui_x, "[Controls]");
     mvprintw(ui_y++, ui_x, "Arrow Keys - Move");
-    mvprintw(ui_y++, ui_x, "W - Wall Break");
     mvprintw(ui_y++, ui_x, "Z - Freeze Enemy");
 
     ui_y++;
@@ -580,7 +574,6 @@ void process_player_move(int key, bool *level_complete_ptr) {
         if (next == 'D') return;
         if (next == 'S') activate_switch();
         if (next == 'K') pickup_key(ny, nx);
-        if (next == 'B') pickup_breaker(ny, nx);
         if (next == 'M') pickup_push_item(ny, nx);
         if (next == '?') {
             maze[ny][nx] = ' ';
